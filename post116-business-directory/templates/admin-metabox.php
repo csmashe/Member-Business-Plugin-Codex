@@ -1,0 +1,122 @@
+<?php if (!defined('ABSPATH')) { exit; } ?>
+<style>
+.p116bd-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.p116bd-repeater .p116bd-row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:8px;margin-bottom:8px}
+.p116bd-repeater .p116bd-row input{width:100%}
+.p116bd-badge{display:inline-block;padding:2px 6px;background:#eee;border-radius:3px;margin-right:4px;font-size:12px}
+</style>
+<?php if (isset($_GET['p116bd_city_required'])): ?>
+  <div class="notice notice-error"><p><?php esc_html_e('City is required for Business entries. The post was saved as draft.', 'post116-business-directory'); ?></p></div>
+<?php endif; ?>
+
+<h3><?php esc_html_e('Owners', 'post116-business-directory'); ?></h3>
+<div class="p116bd-repeater" data-repeater="owners">
+  <div class="p116bd-rows">
+  <?php if (!empty($owners)) : foreach ($owners as $o): ?>
+    <div class="p116bd-row">
+      <input type="text" name="p116bd_owner_name[]" placeholder="<?php esc_attr_e('Name', 'post116-business-directory'); ?>" value="<?php echo esc_attr($o['owner_name'] ?? ''); ?>"/>
+      <input type="text" name="p116bd_owner_role[]" placeholder="<?php esc_attr_e('Role', 'post116-business-directory'); ?>" value="<?php echo esc_attr($o['owner_role'] ?? ''); ?>"/>
+      <input type="email" name="p116bd_owner_email[]" placeholder="<?php esc_attr_e('Email', 'post116-business-directory'); ?>" value="<?php echo esc_attr($o['owner_email'] ?? ''); ?>"/>
+      <input type="text" name="p116bd_owner_phone[]" placeholder="<?php esc_attr_e('Phone', 'post116-business-directory'); ?>" value="<?php echo esc_attr($o['owner_phone'] ?? ''); ?>"/>
+      <input type="url" name="p116bd_owner_website[]" placeholder="<?php esc_attr_e('Website', 'post116-business-directory'); ?>" value="<?php echo esc_attr($o['owner_website'] ?? ''); ?>"/>
+      <button type="button" class="button p116bd-remove">&times;</button>
+    </div>
+  <?php endforeach; endif; ?>
+  </div>
+  <button type="button" class="button button-secondary p116bd-add-owner"><?php esc_html_e('Add Owner', 'post116-business-directory'); ?></button>
+</div>
+
+<h3><?php esc_html_e('Contact', 'post116-business-directory'); ?></h3>
+<div class="p116bd-grid-2">
+  <p><label><?php esc_html_e('Business Phone', 'post116-business-directory'); ?><br/>
+    <input type="text" name="p116bd_business_phone" value="<?php echo esc_attr($fields['business_phone']); ?>"/></label></p>
+  <p><label><?php esc_html_e('Business Email', 'post116-business-directory'); ?><br/>
+    <input type="email" name="p116bd_business_email" value="<?php echo esc_attr($fields['business_email']); ?>"/></label></p>
+  <p><label><?php esc_html_e('Website URL', 'post116-business-directory'); ?><br/>
+    <input type="url" name="p116bd_website_url" value="<?php echo esc_attr($fields['website_url']); ?>"/></label></p>
+</div>
+
+<h3><?php esc_html_e('Address', 'post116-business-directory'); ?></h3>
+<div class="p116bd-grid-2">
+  <p><label><?php esc_html_e('City (required)', 'post116-business-directory'); ?><br/>
+    <input type="text" name="p116bd_city" value="<?php echo esc_attr($fields['city']); ?>" required/></label></p>
+  <p><label><?php esc_html_e('Address 1', 'post116-business-directory'); ?><br/>
+    <input type="text" name="p116bd_address1" value="<?php echo esc_attr($fields['address1']); ?>"/></label></p>
+  <p><label><?php esc_html_e('Address 2', 'post116-business-directory'); ?><br/>
+    <input type="text" name="p116bd_address2" value="<?php echo esc_attr($fields['address2']); ?>"/></label></p>
+  <p><label><?php esc_html_e('State', 'post116-business-directory'); ?><br/>
+    <input type="text" name="p116bd_state" value="<?php echo esc_attr($fields['state']); ?>"/></label></p>
+  <p><label><?php esc_html_e('Postal Code', 'post116-business-directory'); ?><br/>
+    <input type="text" name="p116bd_postal_code" value="<?php echo esc_attr($fields['postal_code']); ?>"/></label></p>
+</div>
+
+<h3><?php esc_html_e('Ownership Flags', 'post116-business-directory'); ?></h3>
+<p>
+  <label><input type="checkbox" name="p116bd_veteran_owned" value="1" <?php checked($fields['veteran_owned']); ?>/> <?php esc_html_e('Veteran Owned', 'post116-business-directory'); ?></label>
+  <label><input type="checkbox" name="p116bd_sons_owned" value="1" <?php checked($fields['sons_owned']); ?>/> <?php esc_html_e('Sons of the American Legion', 'post116-business-directory'); ?></label>
+  <label><input type="checkbox" name="p116bd_auxiliary_owned" value="1" <?php checked($fields['auxiliary_owned']); ?>/> <?php esc_html_e('Auxiliary Owned', 'post116-business-directory'); ?></label>
+</p>
+
+<h3><?php esc_html_e('Services Offered (short list)', 'post116-business-directory'); ?></h3>
+<p><textarea name="p116bd_services_offered" rows="3" style="width:100%"><?php echo esc_textarea($fields['services_offered']); ?></textarea></p>
+
+<h3><?php esc_html_e('Links', 'post116-business-directory'); ?></h3>
+<div class="p116bd-repeater" data-repeater="links">
+  <div class="p116bd-rows">
+  <?php if (!empty($fields['links'])) : foreach ($fields['links'] as $l): ?>
+    <div class="p116bd-row" style="grid-template-columns:2fr 3fr auto">
+      <input type="text" name="p116bd_link_label[]" placeholder="<?php esc_attr_e('Label', 'post116-business-directory'); ?>" value="<?php echo esc_attr($l['link_label'] ?? ''); ?>"/>
+      <input type="url" name="p116bd_link_url[]" placeholder="<?php esc_attr_e('URL', 'post116-business-directory'); ?>" value="<?php echo esc_attr($l['link_url'] ?? ''); ?>"/>
+      <button type="button" class="button p116bd-remove">&times;</button>
+    </div>
+  <?php endforeach; endif; ?>
+  </div>
+  <button type="button" class="button button-secondary p116bd-add-link"><?php esc_html_e('Add Link', 'post116-business-directory'); ?></button>
+</div>
+
+<p><label><input type="checkbox" name="p116bd_show_in_directory" value="1" <?php checked($fields['show_in_directory']); ?>/> <?php esc_html_e('Show in directory', 'post116-business-directory'); ?></label></p>
+
+<script>
+(function(){
+  function addRow(container, type){
+    const rows = container.querySelector('.p116bd-rows');
+    let row;
+    if(type==='owners'){
+      row = document.createElement('div');
+      row.className = 'p116bd-row';
+      row.innerHTML = '\
+<input type="text" name="p116bd_owner_name[]" placeholder="Name"/>\
+<input type="text" name="p116bd_owner_role[]" placeholder="Role"/>\
+<input type="email" name="p116bd_owner_email[]" placeholder="Email"/>\
+<input type="text" name="p116bd_owner_phone[]" placeholder="Phone"/>\
+<input type="url" name="p116bd_owner_website[]" placeholder="Website"/>\
+<button type="button" class="button p116bd-remove">&times;</button>';
+    } else if(type==='links'){
+      row = document.createElement('div');
+      row.className = 'p116bd-row';
+      row.style.gridTemplateColumns = '2fr 3fr auto';
+      row.innerHTML = '\
+<input type="text" name="p116bd_link_label[]" placeholder="Label"/>\
+<input type="url" name="p116bd_link_url[]" placeholder="URL"/>\
+<button type="button" class="button p116bd-remove">&times;</button>';
+    }
+    rows.appendChild(row);
+  }
+  document.addEventListener('click', function(e){
+    if(e.target.matches('.p116bd-add-owner')){
+      e.preventDefault();
+      addRow(e.target.closest('.p116bd-repeater'), 'owners');
+    }
+    if(e.target.matches('.p116bd-add-link')){
+      e.preventDefault();
+      addRow(e.target.closest('.p116bd-repeater'), 'links');
+    }
+    if(e.target.matches('.p116bd-remove')){
+      e.preventDefault();
+      const row = e.target.closest('.p116bd-row');
+      row.parentNode.removeChild(row);
+    }
+  });
+})();
+</script>
+

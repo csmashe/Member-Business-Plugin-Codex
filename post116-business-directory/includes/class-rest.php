@@ -188,6 +188,11 @@ class REST {
             'logo' => (string)$logo_url,
             'services' => $services,
             'owner' => $first_owner,
+            'flags' => [
+                'veteran_owned' => (bool)get_post_meta($id, 'veteran_owned', true),
+                'sons_owned' => (bool)get_post_meta($id, 'sons_owned', true),
+                'auxiliary_owned' => (bool)get_post_meta($id, 'auxiliary_owned', true),
+            ],
         ];
     }
 }

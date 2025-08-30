@@ -30,7 +30,8 @@
 .p116bd-search input[type=text]{flex:1 1 320px;padding:10px 12px}
 .p116bd-search select{flex:0 0 260px;padding:10px 12px}
 .p116bd-flags{flex:1 1 100%;margin-top:6px}
-.p116bd-flags label{margin-right:12px}
+.p116bd-flags label{margin-right:12px;display:inline-flex;align-items:center;gap:6px}
+.p116bd-flag-icon{width:14px;height:14px;object-fit:contain;display:inline-block}
 
 /* Results switch to category sections + rows */
 .p116bd-grid{display:block}
@@ -40,6 +41,7 @@
 .p116bd-row{display:grid;grid-template-columns:100px 1fr;gap:16px;align-items:start;border:1px solid #e3e3e3;border-radius:8px;background:#fff;padding:12px;margin-bottom:12px}
 .p116bd-row__logo img{width:100px;height:100px;object-fit:contain;background:#fafafa;border:1px solid #eee;border-radius:6px}
 .p116bd-logo--placeholder{width:100px;height:100px;background:#f0f0f0;border:1px dashed #ccc;border-radius:6px}
+.p116bd-row__info{display:flex;flex-direction:column}
 .p116bd-row__title{margin:0 0 6px 0}
 .p116bd-directory .p116bd-row__title{font-size:21px !important}
 .p116bd-row__title{font-weight:600;letter-spacing:.01em}
@@ -52,7 +54,10 @@
 .p116bd-row__meta{display:flex;gap:14px;margin-bottom:6px;font-family:Minion Proi, Helvetica, Arial, sans-serif;font-size:20px;font-weight:500;line-height:30px;color:#000000}
 .p116bd-row__services{color:#333;font-size:14px;line-height:1.4}
 
-.p116bd-badge{display:inline-block;background:#eef;border:1px solid #dde;padding:2px 6px;margin-right:6px;border-radius:3px;font-size:12px}
+.p116bd-badge{display:inline-flex;align-items:center;gap:6px;background:#eef;border:1px solid #dde;padding:2px 6px;margin-right:6px;border-radius:3px;font-size:12px}
+.p116bd-badge .p116bd-flag-icon{width:14px;height:14px}
+.p116bd-row__emblems{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-self:flex-start}
+.p116bd-row__emblems .p116bd-flag-icon{height:40px;width:auto}
 .p116bd-pagination{margin-top:16px}
 .p116bd-pagination .p116bd-page{margin-right:6px;padding:6px 10px}
 .p116bd-pagination .p116bd-page:focus{outline:none;box-shadow:0 0 0 3px #005fcc}

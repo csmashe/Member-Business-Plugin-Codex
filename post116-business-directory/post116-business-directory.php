@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Post 116 Business Directory
  * Description: Business directory for American Legion Post 116 with categories, owners, search, and templates.
- * Version: 1.0.2
+ * Version: 1.0.3
  * Author: Post 116
  * Text Domain: post116-business-directory
  * Domain Path: /languages
@@ -10,7 +10,7 @@
 
 if (!defined('ABSPATH')) { exit; }
 
-define('P116BD_VERSION', '1.0.2');
+define('P116BD_VERSION', '1.0.3');
 define('P116BD_PLUGIN_FILE', __FILE__);
 define('P116BD_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('P116BD_PLUGIN_URL', plugin_dir_url(__FILE__));

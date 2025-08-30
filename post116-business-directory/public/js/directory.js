@@ -58,6 +58,26 @@
     if (item.services) {
       info.appendChild(h('div', {className:'p116bd-row__services', textContent:item.services}));
     }
+    if (item.flags && (item.flags.veteran_owned || item.flags.sons_owned || item.flags.auxiliary_owned)) {
+      // Icons only, no text or boxes, must appear as the last row in the card
+      const icons = h('div', {className:'p116bd-row__emblems'});
+      if (item.flags.veteran_owned) {
+        const i = h('img', {className:'p116bd-flag-icon', alt:'American Legion emblem', loading:'lazy'});
+        i.src = (window.p116bdPluginUrl || '/wp-content/plugins/post116-business-directory/') + 'public/icons/TAL-emblem-full-detail-RGB.png';
+        icons.appendChild(i);
+      }
+      if (item.flags.sons_owned) {
+        const i = h('img', {className:'p116bd-flag-icon', alt:'Sons of The American Legion emblem', loading:'lazy'});
+        i.src = (window.p116bdPluginUrl || '/wp-content/plugins/post116-business-directory/') + 'public/icons/SAL-Emblem.png';
+        icons.appendChild(i);
+      }
+      if (item.flags.auxiliary_owned) {
+        const i = h('img', {className:'p116bd-flag-icon', alt:'American Legion Auxiliary emblem', loading:'lazy'});
+        i.src = (window.p116bdPluginUrl || '/wp-content/plugins/post116-business-directory/') + 'public/icons/Auxiliary-Emblem.png';
+        icons.appendChild(i);
+      }
+      info.appendChild(icons);
+    }
     row.appendChild(info);
     return row;
   }

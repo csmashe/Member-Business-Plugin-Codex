@@ -29,6 +29,8 @@ class Block_Directory {
     }
 
     public static function render($attrs = [], $content = '', $block = null) {
+        // Pass plugin URL to JS for icon paths
+        wp_add_inline_script('p116bd-directory', 'window.p116bdPluginUrl = ' . json_encode(P116BD_PLUGIN_URL) . ';', 'before');
         wp_enqueue_script('p116bd-directory');
         wp_enqueue_style('p116bd-public');
         $placeholder = isset($attrs['placeholderText']) ? esc_attr($attrs['placeholderText']) : __('Search businesses…', 'post116-business-directory');
@@ -58,8 +60,11 @@ class Block_Directory {
                 echo '<style>
                 .page-id-' . $pid . ' main article > h1{display:none;}
                 .page-id-' . $pid . ' .entry-title{display:none;}
+                .page-id-' . $pid . ' .entry-header{display:none !important;}
                 .page-id-' . $pid . ' .ast-container{max-width:100%;padding:0;}
                 .page-id-' . $pid . ' .content-area.primary{padding:0 !important;margin:0 !important;}
+                .page-id-' . $pid . ' .site-main{margin-top:0 !important;}
+                .page-id-' . $pid . ' .site-content::before, .page-id-' . $pid . ' #content::before{content:none !important;display:none !important;height:0 !important;margin:0 !important;padding:0 !important;}
                 </style>';
             }
           ?>

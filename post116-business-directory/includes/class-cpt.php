@@ -16,6 +16,7 @@ class CPT {
         add_action('admin_init', [__CLASS__, 'register_admin_columns']);
         add_action('restrict_manage_posts', [__CLASS__, 'admin_filters']);
         add_filter('parse_query', [__CLASS__, 'apply_admin_filters']);
+        add_filter('use_block_editor_for_post_type', [__CLASS__, 'disable_block_editor'], 10, 2);
     }
 
     public static function register_post_type() {
@@ -30,7 +31,8 @@ class CPT {
             'public' => true,
             'has_archive' => false,
             'show_in_rest' => true,
-            'supports' => ['title', 'editor', 'thumbnail', 'excerpt', 'revisions'],
+            // No content editor; data via meta fields only.
+            'supports' => ['title', 'thumbnail', 'revisions'],
             'rewrite' => ['slug' => 'directory', 'with_front' => false],
             'map_meta_cap' => true,
             'capability_type' => [
@@ -218,5 +220,9 @@ class CPT {
         if (!empty($_GET[self::TAXONOMY])) {
             $query->query_vars[self::TAXONOMY] = (int)$_GET[self::TAXONOMY];
         }
+    }
+
+    public static function disable_block_editor($use, $post_type) {
+        return ($post_type === self::POST_TYPE) ? false : $use;
     }
 }

@@ -34,13 +34,24 @@ class Loader {
 
     private static function maybe_create_directory_page() {
         $option_key = 'p116bd_directory_page_id';
-        $page_id = get_option($option_key);
-        if ($page_id && get_post($page_id)) {
-            return;
+        $page_id = (int) get_option($option_key);
+        if ($page_id) {
+            $p = get_post($page_id);
+            if ($p && $p->post_type === 'page' && $p->post_status === 'publish') {
+                return; // Option already points to a published page.
+            }
         }
-        $existing = get_page_by_path('directory');
-        if ($existing) {
-            update_option($option_key, $existing->ID);
+
+        // Look for an existing published page explicitly.
+        $published = get_posts([
+            'post_type'   => 'page',
+            'post_status' => 'publish',
+            'name'        => 'directory', // Matches post_name (slug)
+            'numberposts' => 1,
+            'fields'      => 'ids',
+        ]);
+        if (!empty($published)) {
+            update_option($option_key, (int) $published[0]);
             return;
         }
         $content = '<!-- wp:p116/directory {"showFlags":true,"perPage":12} /-->';
@@ -76,4 +87,3 @@ class Loader {
         }
     }
 }
-

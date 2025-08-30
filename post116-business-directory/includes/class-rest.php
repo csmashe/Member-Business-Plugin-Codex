@@ -43,11 +43,13 @@ class REST {
         $per_page = max(1, min(50, (int)$req->get_param('per_page')));
         $page = max(1, (int)$req->get_param('page'));
 
-        $meta_query = [['key' => 'show_in_directory', 'value' => '1']];
+        $meta_query = [ 'relation' => 'AND', [ 'key' => 'show_in_directory', 'value' => '1' ] ];
         if ($q) {
-            $meta_query['relation'] = 'OR';
-            $meta_query[] = ['key' => 'owners_search', 'value' => $q, 'compare' => 'LIKE'];
-            $meta_query[] = ['key' => 'city_search', 'value' => strtolower($q), 'compare' => 'LIKE'];
+            $meta_query[] = [
+                'relation' => 'OR',
+                ['key' => 'owners_search', 'value' => strtolower($q), 'compare' => 'LIKE'],
+                ['key' => 'city_search',   'value' => strtolower($q), 'compare' => 'LIKE'],
+            ];
         }
         foreach (['veteran_owned','sons_owned','auxiliary_owned'] as $flag) {
             if (in_array($flag, $flags, true)) {
@@ -96,6 +98,7 @@ class REST {
             's' => $q,
             'posts_per_page' => $limit,
             'post_status' => 'publish',
+            'meta_query' => [ [ 'key' => 'show_in_directory', 'value' => '1' ] ],
         ]);
         foreach ($posts as $p) {
             $suggestions[] = ['type' => 'business', 'label' => $p->post_title, 'slug' => $p->post_name];
@@ -106,14 +109,18 @@ class REST {
             'post_type' => CPT::POST_TYPE,
             'posts_per_page' => $limit,
             'meta_query' => [
-                ['key' => 'owners_search', 'value' => $q, 'compare' => 'LIKE']
+                'relation' => 'AND',
+                ['key' => 'show_in_directory', 'value' => '1'],
+                ['key' => 'owners_search', 'value' => strtolower($q), 'compare' => 'LIKE']
             ],
             'post_status' => 'publish',
         ]);
+        $q_lc = strtolower($q);
         foreach ($owner_posts as $p) {
             $owners = (array)get_post_meta($p->ID, 'owners', true);
             foreach ($owners as $o) {
-                if (!empty($o['owner_name']) && stripos($o['owner_name'], $q) !== false) {
+                $name = $o['owner_name'] ?? '';
+                if ($name !== '' && strpos(strtolower($name), $q_lc) !== false) {
                     $suggestions[] = ['type' => 'owner', 'label' => $o['owner_name'], 'slug' => $p->post_name];
                 }
             }
@@ -170,4 +177,3 @@ class REST {
         ];
     }
 }
-

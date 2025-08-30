@@ -56,7 +56,7 @@ class Meta {
         if (!current_user_can('edit_post', $post_id)) return;
 
         // Required: city
-        $city = isset($_POST['p116bd_city']) ? sanitize_text_field($_POST['p116bd_city']) : '';
+        $city = isset($_POST['p116bd_city']) ? sanitize_text_field(wp_unslash($_POST['p116bd_city'])) : '';
         if ($city === '') {
             // Prevent publish without city: set to draft and add admin notice.
             remove_action('save_post_' . CPT::POST_TYPE, [__CLASS__, 'save_meta'], 10);
@@ -68,17 +68,22 @@ class Meta {
 
         // Owners repeater
         $owners = [];
-        if (!empty($_POST['p116bd_owner_name']) && is_array($_POST['p116bd_owner_name'])) {
-            $count = count($_POST['p116bd_owner_name']);
+        $owner_names  = (array) (isset($_POST['p116bd_owner_name']) ? wp_unslash($_POST['p116bd_owner_name']) : []);
+        $owner_roles  = (array) (isset($_POST['p116bd_owner_role']) ? wp_unslash($_POST['p116bd_owner_role']) : []);
+        $owner_emails = (array) (isset($_POST['p116bd_owner_email']) ? wp_unslash($_POST['p116bd_owner_email']) : []);
+        $owner_phones = (array) (isset($_POST['p116bd_owner_phone']) ? wp_unslash($_POST['p116bd_owner_phone']) : []);
+        $owner_sites  = (array) (isset($_POST['p116bd_owner_website']) ? wp_unslash($_POST['p116bd_owner_website']) : []);
+        if (!empty($owner_names)) {
+            $count = count($owner_names);
             for ($i = 0; $i < $count; $i++) {
-                $name = sanitize_text_field($_POST['p116bd_owner_name'][$i] ?? '');
+                $name = sanitize_text_field($owner_names[$i] ?? '');
                 if ($name === '') continue;
                 $owners[] = [
-                    'owner_name'  => $name,
-                    'owner_role'  => sanitize_text_field($_POST['p116bd_owner_role'][$i] ?? ''),
-                    'owner_email' => sanitize_email($_POST['p116bd_owner_email'][$i] ?? ''),
-                    'owner_phone' => sanitize_text_field($_POST['p116bd_owner_phone'][$i] ?? ''),
-                    'owner_website'=> esc_url_raw($_POST['p116bd_owner_website'][$i] ?? ''),
+                    'owner_name'   => $name,
+                    'owner_role'   => sanitize_text_field($owner_roles[$i] ?? ''),
+                    'owner_email'  => sanitize_email($owner_emails[$i] ?? ''),
+                    'owner_phone'  => sanitize_text_field($owner_phones[$i] ?? ''),
+                    'owner_website'=> esc_url_raw($owner_sites[$i] ?? ''),
                 ];
             }
         }
@@ -87,12 +92,14 @@ class Meta {
 
         // Links repeater
         $links = [];
-        if (!empty($_POST['p116bd_link_label']) && is_array($_POST['p116bd_link_label'])) {
-            $count = count($_POST['p116bd_link_label']);
+        $labels = (array) (isset($_POST['p116bd_link_label']) ? wp_unslash($_POST['p116bd_link_label']) : []);
+        $urls   = (array) (isset($_POST['p116bd_link_url']) ? wp_unslash($_POST['p116bd_link_url']) : []);
+        if (!empty($labels)) {
+            $count = count($labels);
             for ($i = 0; $i < $count; $i++) {
-                $label = sanitize_text_field($_POST['p116bd_link_label'][$i] ?? '');
-                $url   = esc_url_raw($_POST['p116bd_link_url'][$i] ?? '');
-                if ($label || $url) {
+                $label = sanitize_text_field($labels[$i] ?? '');
+                $url   = esc_url_raw($urls[$i] ?? '');
+                if ($label !== '' || $url !== '') {
                     $links[] = [ 'link_label' => $label, 'link_url' => $url ];
                 }
             }
@@ -112,7 +119,21 @@ class Meta {
             'services_offered'=> 'p116bd_services_offered',
         ];
         foreach ($map as $meta_key => $post_key) {
-            $val = isset($_POST[$post_key]) ? sanitize_text_field(wp_unslash($_POST[$post_key])) : '';
+            $raw = isset($_POST[$post_key]) ? wp_unslash($_POST[$post_key]) : '';
+            switch ($meta_key) {
+                case 'business_email':
+                    $val = sanitize_email($raw);
+                    break;
+                case 'website_url':
+                    $val = esc_url_raw($raw);
+                    break;
+                case 'services_offered':
+                    $val = sanitize_textarea_field($raw);
+                    break;
+                default:
+                    $val = sanitize_text_field($raw);
+            }
+            $val = is_string($val) ? trim($val) : $val;
             update_post_meta($post_id, $meta_key, $val);
         }
 
@@ -131,4 +152,3 @@ class Meta {
         delete_transient('p116bd_category_groups');
     }
 }
-

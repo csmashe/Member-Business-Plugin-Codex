@@ -31,8 +31,7 @@ add_action('plugins_loaded', function () {
     load_plugin_textdomain('post116-business-directory', false, dirname(plugin_basename(__FILE__)) . '/languages');
 });
 
-// Bootstrap plugin.
-add_action('init', function () {
+// Bootstrap plugin early so CPT hooks attach to `init` before it fires.
+add_action('plugins_loaded', function () {
     \P116BD\Loader::init();
 });
-

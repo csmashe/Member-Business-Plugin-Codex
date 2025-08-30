@@ -4,12 +4,17 @@
 .p116bd-search select{padding:8px}
 .p116bd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:var(--gap)}
 .p116bd-card{border:1px solid #e3e3e3;border-radius:8px;overflow:hidden;background:#fff}
-.p116bd-card__link{display:block;color:inherit;text-decoration:none;padding:12px}
+.p116bd-card__link{display:block;color:inherit;text-decoration:none;padding:12px;border-radius:inherit}
+.p116bd-card__link:focus{outline:none;box-shadow:0 0 0 3px #005fcc;}
+.p116bd-card__link:focus:not(:focus-visible){box-shadow:none;}
+.p116bd-card__link:focus-visible{outline:none;box-shadow:0 0 0 3px #005fcc}
 .p116bd-card__title{margin:0 0 6px 0;font-size:18px}
 .p116bd-badge{display:inline-block;background:#eef;border:1px solid #dde;padding:2px 6px;margin-right:6px;border-radius:3px;font-size:12px}
 .p116bd-card__meta{display:flex;gap:10px;color:#555;font-size:14px}
 .p116bd-pagination{margin-top:16px}
 .p116bd-pagination .p116bd-page{margin-right:6px;padding:6px 10px}
+.p116bd-pagination .p116bd-page:focus{outline:none;box-shadow:0 0 0 3px #005fcc}
+.p116bd-pagination .p116bd-page:focus:not(:focus-visible){box-shadow:none}
+.p116bd-pagination .p116bd-page:focus-visible{outline:none;box-shadow:0 0 0 3px #005fcc}
 .p116bd-legal{margin-top:12px;font-size:12px;color:#555}
 .p116bd-single .p116bd-list{list-style:none;padding:0}
-

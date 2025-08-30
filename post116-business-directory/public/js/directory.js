@@ -7,7 +7,26 @@
     children.forEach(c => e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c));
     return e;
   }
-  function fetchJSON(url){ return fetch(url, {credentials:'same-origin'}).then(r => r.json()); }
+  async function fetchJSON(url){
+    const res = await fetch(url, {credentials:'same-origin'});
+    const ct = res.headers.get('content-type') || '';
+    if (!res.ok) {
+      let detail = '';
+      try { detail = await res.text(); } catch(_) {}
+      const msg = `HTTP ${res.status} ${res.statusText}${detail ? ' — ' + detail.slice(0,200) : ''}`;
+      throw new Error(msg);
+    }
+    // No body
+    if (res.status === 204) return {};
+    if (ct.indexOf('application/json') !== -1) {
+      try { return await res.json(); } catch(_) { return {}; }
+    }
+    // Fallback: try to parse as JSON, else return empty
+    try {
+      const text = await res.text();
+      return text ? JSON.parse(text) : {};
+    } catch(_) { return {}; }
+  }
 
   function renderCard(item){
     const wrap = h('div', {className:'p116bd-card'});
@@ -25,6 +44,7 @@
 
   function renderResults(root, res){
     const grid = qs(root, '.p116bd-grid');
+    if (!grid) return;
     grid.innerHTML = '';
     // Group by first category name
     const groups = {};
@@ -37,22 +57,31 @@
       groups[cat].sort((a,b)=>a.title.localeCompare(b.title)).forEach(item => grid.appendChild(renderCard(item)));
     });
     const legal = qs(root, '.p116bd-legal');
-    legal.textContent = qs(root, '.p116bd-results').dataset.legal;
+    const resultsEl = qs(root, '.p116bd-results');
+    if (legal && resultsEl && resultsEl.dataset) {
+      legal.textContent = resultsEl.dataset.legal || '';
+    }
     const pag = qs(root, '.p116bd-pagination');
-    pag.innerHTML = '';
-    if (res.pages > 1) {
-      for(let i=1;i<=res.pages;i++){
-        const b = h('button', {className:'p116bd-page' + (i===currentPage?' is-active':''), textContent:String(i)});
-        b.addEventListener('click', () => { currentPage = i; doSearch(root); });
-        pag.appendChild(b);
+    if (pag) {
+      pag.innerHTML = '';
+      if (res.pages > 1) {
+        for(let i=1;i<=res.pages;i++){
+          const b = h('button', {className:'p116bd-page' + (i===currentPage?' is-active':''), textContent:String(i)});
+          b.addEventListener('click', () => { currentPage = i; doSearch(root); });
+          pag.appendChild(b);
+        }
       }
     }
   }
 
   function buildURL(root){
-    const q = qs(root, '.p116bd-q').value.trim();
-    const cat = qs(root, '.p116bd-category').value;
-    const per = root.dataset.perPage || 12;
+    const qEl = qs(root, '.p116bd-q');
+    const q = qEl ? qEl.value.trim() : '';
+    const catEl = qs(root, '.p116bd-category');
+    const cat = catEl ? catEl.value : '';
+    const perRaw = root && root.dataset ? root.dataset.perPage : undefined;
+    let per = Number.parseInt(perRaw, 10);
+    if (Number.isNaN(per) || per <= 0) per = 12;
     const flags = qsa(root, '.p116bd-flag:checked').map(e => e.value);
     const p = new URLSearchParams();
     if (q) p.set('q', q);

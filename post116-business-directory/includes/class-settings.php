@@ -33,11 +33,13 @@ class Settings {
 
         add_settings_field('p116bd_flags_visible', __('Show Ownership Filters', 'post116-business-directory'), function(){
             $val = (bool)get_option('p116bd_flags_visible', true);
+            echo '<input type="hidden" name="p116bd_flags_visible" value="0" />';
             echo '<input type="checkbox" name="p116bd_flags_visible" value="1"' . checked($val, true, false) . ' />';
         }, 'p116bd', 'p116bd_main');
 
         add_settings_field('p116bd_enable_map', __('Enable Map (Phase 2)', 'post116-business-directory'), function(){
             $val = (bool)get_option('p116bd_enable_map', false);
+            echo '<input type="hidden" name="p116bd_enable_map" value="0" />';
             echo '<input type="checkbox" name="p116bd_enable_map" value="1"' . checked($val, true, false) . ' />';
         }, 'p116bd', 'p116bd_main');
     }
@@ -51,4 +53,3 @@ class Settings {
         echo '</form></div>';
     }
 }
-

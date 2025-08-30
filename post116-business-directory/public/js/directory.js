@@ -90,9 +90,21 @@
     const container = grid;
     if (!append) container.innerHTML = '';
 
+    // Clear any previous empty state
+    const emptyEl = qs(root, '.p116bd-empty');
+    if (emptyEl) emptyEl.remove();
+
+    const items = Array.isArray(res.items) ? res.items : [];
+    if (!append && items.length === 0) {
+      // No results message; do not leave the grid blank
+      const msg = h('p', { className: 'p116bd-empty', textContent: 'No results found. Try different terms or filters.' });
+      container.innerHTML = '';
+      container.appendChild(msg);
+    }
+
     // Group by first category name and append
     const groups = {};
-    (res.items || []).forEach(it => {
+    items.forEach(it => {
       const key = (it.categories && it.categories.length ? it.categories[0] : 'Uncategorized');
       (groups[key] ||= []).push(it);
     });
@@ -150,12 +162,19 @@
     const state = root._p116 || (root._p116 = {page:1});
     if (state.loading) return;
     state.loading = true;
+    // Blur the results section while loading, without clearing existing results
+    const resultsWrap = qs(root, '.p116bd-results');
+    if (resultsWrap) resultsWrap.classList.add('is-loading');
     const url = buildURL(root);
     fetchJSON(url).then(res => {
       renderResults(root, res, !!append);
     }).catch(() => {
-      if (!append) qs(root, '.p116bd-grid').innerHTML = '<p>Failed to load results.</p>';
-    }).finally(()=>{ state.loading = false; });
+      if (!append) qs(root, '.p116bd-grid').innerHTML = '<p class="p116bd-empty">Failed to load results.</p>';
+    }).finally(()=>{
+      state.loading = false;
+      const results = qs(root, '.p116bd-results');
+      if (results) results.classList.remove('is-loading');
+    });
   }
 
   function setupObserver(root){
@@ -186,7 +205,6 @@
     root.addEventListener('change', (e) => {
       if (e.target.matches('.p116bd-flag') || e.target === cat) {
         root._p116.page = 1; root._p116.pages = 1;
-        qs(root, '.p116bd-grid').innerHTML = '';
         doSearch(root, false);
       }
     });
@@ -216,7 +234,6 @@
       t = setTimeout(() => {
         doAC();
         root._p116.page = 1; root._p116.pages = 1;
-        qs(root, '.p116bd-grid').innerHTML = '';
         doSearch(root, false);
       }, 250);
     });

@@ -69,6 +69,14 @@
 .p116bd-legal{margin-top:12px;font-size:12px;color:#555}
 .p116bd-single .p116bd-list{list-style:none;padding:0}
 
+/* Loading and empty states */
+.p116bd-loading{display:none;margin:8px 0;color:#333;font-size:16px}
+.p116bd-empty{margin:12px 0;color:#444;font-size:18px}
+
+/* Blur lower section while searching */
+.p116bd-results{transition:filter 120ms ease}
+.p116bd-results.is-loading{filter:blur(2px);pointer-events:none}
+
 /* Mobile adjustments */
 @media (max-width: 768px){
   .p116bd-hero__kicker{ text-align:center !important; }

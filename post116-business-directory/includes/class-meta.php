@@ -16,6 +16,22 @@ class Meta {
             // Needed for media uploader (logo field)
             if (function_exists('wp_enqueue_media')) { wp_enqueue_media(); }
             wp_enqueue_script('p116bd-meta', P116BD_PLUGIN_URL . 'public/js/meta.js', ['jquery'], P116BD_VERSION, true);
+            // Localize admin UI labels for JS usage
+            wp_localize_script('p116bd-meta', 'p116bdLabels', [
+                'name' => esc_html__('Name', 'post116-business-directory'),
+                'role' => esc_html__('Role', 'post116-business-directory'),
+                'email' => esc_html__('Email', 'post116-business-directory'),
+                'phone' => esc_html__('Phone', 'post116-business-directory'),
+                'website' => esc_html__('Website', 'post116-business-directory'),
+                'ownership' => esc_html__('— Ownership —', 'post116-business-directory'),
+                'veteran' => esc_html__('Veteran', 'post116-business-directory'),
+                'sal' => esc_html__('SAL', 'post116-business-directory'),
+                'auxiliary' => esc_html__('Auxiliary', 'post116-business-directory'),
+                'link_label' => esc_html__('Label', 'post116-business-directory'),
+                'link_url' => esc_html__('URL', 'post116-business-directory'),
+                'mediaSelectLogo' => esc_html__('Select Logo', 'post116-business-directory'),
+                'mediaUseLogo' => esc_html__('Use this logo', 'post116-business-directory'),
+            ]);
             wp_enqueue_style('p116bd-admin', P116BD_PLUGIN_URL . 'public/css/admin.css', [], P116BD_VERSION);
         }
     }
@@ -99,14 +115,15 @@ class Meta {
         $links = [];
         $labels = (array) (isset($_POST['p116bd_link_label']) ? wp_unslash($_POST['p116bd_link_label']) : []);
         $urls   = (array) (isset($_POST['p116bd_link_url']) ? wp_unslash($_POST['p116bd_link_url']) : []);
-        if (!empty($labels)) {
-            $count = count($labels);
+        $count  = max(count($labels), count($urls));
+        if ($count > 0) {
             for ($i = 0; $i < $count; $i++) {
-                $label = sanitize_text_field($labels[$i] ?? '');
-                $url   = esc_url_raw($urls[$i] ?? '');
-                if ($label !== '' || $url !== '') {
-                    $links[] = [ 'link_label' => $label, 'link_url' => $url ];
-                }
+                $raw_label = $labels[$i] ?? '';
+                $raw_url   = $urls[$i] ?? '';
+                $label = sanitize_text_field($raw_label);
+                $url   = esc_url_raw($raw_url);
+                if ($label === '' && $url === '') { continue; }
+                $links[] = [ 'link_label' => $label, 'link_url' => $url ];
             }
         }
         update_post_meta($post_id, 'links', $links);

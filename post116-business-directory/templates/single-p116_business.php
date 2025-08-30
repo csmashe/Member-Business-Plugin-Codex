@@ -3,8 +3,39 @@ if (!defined('ABSPATH')) { exit; }
 get_header();
 $id = get_the_ID();
 $logo_id = (int) get_post_meta($id, 'business_logo_id', true);
-$owners = (array)get_post_meta($id, 'owners', true);
-$links = (array)get_post_meta($id, 'links', true);
+$owners_meta = get_post_meta($id, 'owners', true);
+$owners = [];
+if (is_array($owners_meta)) {
+  foreach ($owners_meta as $o) {
+    if (!is_array($o)) { continue; }
+    // Normalize expected keys to strings
+    $item = [
+      'owner_name'    => isset($o['owner_name']) ? (string)$o['owner_name'] : '',
+      'owner_role'    => isset($o['owner_role']) ? (string)$o['owner_role'] : '',
+      'owner_email'   => isset($o['owner_email']) ? (string)$o['owner_email'] : '',
+      'owner_phone'   => isset($o['owner_phone']) ? (string)$o['owner_phone'] : '',
+      'owner_website' => isset($o['owner_website']) ? (string)$o['owner_website'] : '',
+      'owner_affil'   => isset($o['owner_affil']) ? (string)$o['owner_affil'] : '',
+    ];
+    // Keep only non-empty owner entries
+    if (trim($item['owner_name']) !== '' || trim($item['owner_email']) !== '' || trim($item['owner_phone']) !== '') {
+      $owners[] = $item;
+    }
+  }
+}
+
+$links_meta = get_post_meta($id, 'links', true);
+$links = [];
+if (is_array($links_meta)) {
+  foreach ($links_meta as $l) {
+    if (!is_array($l)) { continue; }
+    $label = isset($l['link_label']) ? (string)$l['link_label'] : '';
+    $url   = isset($l['link_url']) ? (string)$l['link_url'] : '';
+    if ($label !== '' || $url !== '') {
+      $links[] = ['link_label' => $label, 'link_url' => $url];
+    }
+  }
+}
 // Ensure public styles are loaded (reuse directory styling)
 wp_enqueue_style('p116bd-public');
 wp_enqueue_script('p116bd-single', P116BD_PLUGIN_URL . 'public/js/single.js', [], P116BD_VERSION, true);
@@ -15,7 +46,11 @@ $opt_title = (string) get_option('p116bd_hero_title', '');
 $opt_sub = (string) get_option('p116bd_hero_subtitle', '');
 $banner_title = $opt_title !== '' ? $opt_title : __('Business Directory', 'post116-business-directory');
 $banner_sub = $opt_sub;
-$hero_img = $opt_img ?: 'https://alpost116nc2.wpenginepowered.com/wp-content/uploads/2024/05/ALP116_MastheadImage_Legionnaire_1920x675.png';
+$hero_img = trim((string)$opt_img);
+// Normalize relative path to absolute URL
+if ($hero_img && !preg_match('#^https?://#i', $hero_img)) {
+  $hero_img = home_url($hero_img[0] === '/' ? $hero_img : '/' . $hero_img);
+}
 $hero_style = '';
 if ($hero_img) {
   $hero_style = 'style="background-image: linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.25)), url(' . esc_url($hero_img) . ');background-size:cover;background-position:center;background-repeat:no-repeat;display:flex;align-items:center;justify-content:center;min-height:675px;"';

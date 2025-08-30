@@ -82,13 +82,17 @@
     return row;
   }
 
-  function renderResults(root, res){
+  function renderResults(root, res, append){
     const grid = qs(root, '.p116bd-grid');
     if (!grid) return;
-    grid.innerHTML = '';
-    // Group by first category name
+    const state = root._p116 || (root._p116 = {});
+    state.pages = Number(res.pages || 1);
+    const container = grid;
+    if (!append) container.innerHTML = '';
+
+    // Group by first category name and append
     const groups = {};
-    res.items.forEach(it => {
+    (res.items || []).forEach(it => {
       const key = (it.categories && it.categories.length ? it.categories[0] : 'Uncategorized');
       (groups[key] ||= []).push(it);
     });
@@ -99,23 +103,27 @@
       const list = h('div', {className:'p116bd-list'});
       groups[cat].sort((a,b)=>a.title.localeCompare(b.title)).forEach(item => list.appendChild(renderRow(item)));
       section.appendChild(list);
-      grid.appendChild(section);
+      container.appendChild(section);
     });
+
     const legal = qs(root, '.p116bd-legal');
     const resultsEl = qs(root, '.p116bd-results');
     if (legal && resultsEl && resultsEl.dataset) {
       legal.textContent = resultsEl.dataset.legal || '';
     }
-    const pag = qs(root, '.p116bd-pagination');
-    if (pag) {
-      pag.innerHTML = '';
-      if (res.pages > 1) {
-        for(let i=1;i<=res.pages;i++){
-          const b = h('button', {className:'p116bd-page' + (i===currentPage?' is-active':''), textContent:String(i)});
-          b.addEventListener('click', () => { currentPage = i; doSearch(root); });
-          pag.appendChild(b);
-        }
-      }
+
+    // Ensure sentinel exists for infinite scroll
+    let sent = state.sentinel;
+    if (!sent) {
+      sent = document.createElement('div');
+      sent.className = 'p116bd-sentinel';
+      sent.style.height = '1px';
+      sent.style.width = '100%';
+      container.appendChild(sent);
+      state.sentinel = sent;
+      setupObserver(root);
+    } else if (!container.contains(sent)) {
+      container.appendChild(sent);
     }
   }
 
@@ -133,23 +141,54 @@
     if (cat) p.set('category', cat);
     if (flags.length) flags.forEach(f => p.append('flags[]', f));
     p.set('per_page', per);
-    p.set('page', currentPage);
+    const state = root._p116 || (root._p116 = {page:1});
+    p.set('page', state.page || 1);
     return (window.wpApiSettings?.root || '/wp-json/') + 'p116/v1/search?' + p.toString();
   }
 
-  function doSearch(root){
+  function doSearch(root, append){
+    const state = root._p116 || (root._p116 = {page:1});
+    if (state.loading) return;
+    state.loading = true;
     const url = buildURL(root);
-    fetchJSON(url).then(res => renderResults(root, res)).catch(() => {
-      qs(root, '.p116bd-grid').innerHTML = '<p>Failed to load results.</p>';
-    });
+    fetchJSON(url).then(res => {
+      renderResults(root, res, !!append);
+    }).catch(() => {
+      if (!append) qs(root, '.p116bd-grid').innerHTML = '<p>Failed to load results.</p>';
+    }).finally(()=>{ state.loading = false; });
   }
 
-  let currentPage = 1;
+  function setupObserver(root){
+    const state = root._p116 || (root._p116 = {});
+    if (state.observer) state.observer.disconnect();
+    const sent = state.sentinel;
+    if (!sent) return;
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const s = root._p116;
+          if (!s || s.loading) return;
+          if ((s.page || 1) >= (s.pages || 1)) return;
+          s.page = (s.page || 1) + 1;
+          doSearch(root, true);
+        }
+      });
+    }, { rootMargin: '200px 0px' });
+    io.observe(sent);
+    state.observer = io;
+  }
+
   function attach(root){
+    // reset state
+    root._p116 = { page: 1, pages: 1, loading: false, sentinel: null, observer: null };
     const q = qs(root, '.p116bd-q');
     const cat = qs(root, '.p116bd-category');
     root.addEventListener('change', (e) => {
-      if (e.target.matches('.p116bd-flag') || e.target === cat) { currentPage = 1; doSearch(root); }
+      if (e.target.matches('.p116bd-flag') || e.target === cat) {
+        root._p116.page = 1; root._p116.pages = 1;
+        qs(root, '.p116bd-grid').innerHTML = '';
+        doSearch(root, false);
+      }
     });
     let t;
     // Autocomplete via datalist
@@ -172,8 +211,16 @@
           });
         }).catch(()=>{});
     }
-    q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { doAC(); currentPage = 1; doSearch(root); }, 250); });
-    doSearch(root);
+    q.addEventListener('input', () => {
+      clearTimeout(t);
+      t = setTimeout(() => {
+        doAC();
+        root._p116.page = 1; root._p116.pages = 1;
+        qs(root, '.p116bd-grid').innerHTML = '';
+        doSearch(root, false);
+      }, 250);
+    });
+    doSearch(root, false);
   }
 
   document.addEventListener('DOMContentLoaded', () => {

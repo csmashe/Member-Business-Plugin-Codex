@@ -6,6 +6,9 @@ if (!defined('ABSPATH')) { exit; }
 class Block_Directory {
     public static function register() {
         add_action('init', [__CLASS__, 'register_block']);
+        // Register asset handles early for both editor and front-end.
+        add_action('init', [__CLASS__, 'register_assets']);
+        // Keep front-end registration as a safety net (no-op if already registered).
         add_action('wp_enqueue_scripts', [__CLASS__, 'register_assets']);
     }
 
@@ -24,6 +27,7 @@ class Block_Directory {
     }
 
     public static function register_assets() {
+        // Only register; actual enqueue happens where needed (render or elsewhere).
         wp_register_script('p116bd-directory', P116BD_PLUGIN_URL . 'public/js/directory.js', ['wp-i18n'], P116BD_VERSION, true);
         wp_register_style('p116bd-public', P116BD_PLUGIN_URL . 'public/css/public.css', [], P116BD_VERSION);
     }
@@ -44,7 +48,11 @@ class Block_Directory {
         $banner_title = isset($attrs['bannerTitle']) && $attrs['bannerTitle'] !== '' ? $attrs['bannerTitle'] : ($opt_title !== '' ? $opt_title : __('Business Directory', 'post116-business-directory'));
         $banner_sub = isset($attrs['bannerSubtitle']) && $attrs['bannerSubtitle'] !== '' ? $attrs['bannerSubtitle'] : $opt_sub;
         $hero_style = '';
-        $img = $opt_img ?: 'https://alpost116nc2.wpenginepowered.com/wp-content/uploads/2024/05/ALP116_MastheadImage_Legionnaire_1920x675.png';
+        // Normalize image URL: allow relative like /wp-content/uploads/... and convert to absolute
+        $img = trim((string)$opt_img);
+        if ($img && !preg_match('#^https?://#i', $img)) {
+            $img = home_url($img[0] === '/' ? $img : '/' . $img);
+        }
         if ($img) {
             $hero_style = 'style="background-image: linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.25)), url(' . esc_url($img) . ');background-size:cover;background-position:center;background-repeat:no-repeat;display:flex;align-items:center;justify-content:center;min-height:675px;"';
         }
@@ -88,9 +96,11 @@ class Block_Directory {
             <input type="text" class="p116bd-q" placeholder="<?php echo $placeholder; ?>" style="height:44px;line-height:44px;" />
             <select class="p116bd-category" style="height:44px;line-height:44px;">
               <option value=""><?php esc_html_e('All Categories', 'post116-business-directory'); ?></option>
-              <?php foreach (get_terms(['taxonomy' => CPT::TAXONOMY, 'hide_empty' => false]) as $t): ?>
-                <option value="<?php echo esc_attr($t->slug); ?>"><?php echo esc_html($t->name); ?></option>
-              <?php endforeach; ?>
+              <?php $terms = get_terms(['taxonomy' => CPT::TAXONOMY, 'hide_empty' => false]);
+              if (!is_wp_error($terms) && is_array($terms) && !empty($terms)) :
+                foreach ($terms as $t): ?>
+                  <option value="<?php echo esc_attr($t->slug); ?>"><?php echo esc_html($t->name); ?></option>
+                <?php endforeach; endif; ?>
             </select>
             <?php if ($show_flags): ?>
             <div class="p116bd-flags">

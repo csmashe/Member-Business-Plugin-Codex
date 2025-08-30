@@ -21,7 +21,6 @@ class Settings {
 
     public static function settings() {
         register_setting('p116bd', 'p116bd_directory_page_id', ['type'=>'integer']);
-        register_setting('p116bd', 'p116bd_enable_map', ['type'=>'boolean', 'default'=>false]);
         register_setting('p116bd', 'p116bd_flags_visible', ['type'=>'boolean', 'default'=>true]);
         // Hero/banner settings
         register_setting('p116bd', 'p116bd_hero_image_url', ['type'=>'string', 'default'=>'']);
@@ -44,16 +43,26 @@ class Settings {
             echo '<input type="checkbox" name="p116bd_flags_visible" value="1"' . checked($val, true, false) . ' />';
         }, 'p116bd', 'p116bd_main');
 
-        add_settings_field('p116bd_enable_map', __('Enable Map (Phase 2)', 'post116-business-directory'), function(){
-            $val = (bool)get_option('p116bd_enable_map', false);
-            echo '<input type="hidden" name="p116bd_enable_map" value="0" />';
-            echo '<input type="checkbox" name="p116bd_enable_map" value="1"' . checked($val, true, false) . ' />';
-        }, 'p116bd', 'p116bd_main');
-
-        add_settings_field('p116bd_hero_image_url', __('Directory Hero Image URL', 'post116-business-directory'), function(){
+        add_settings_field('p116bd_hero_image_url', __('Directory Hero Image', 'post116-business-directory'), function(){
+            if (function_exists('wp_enqueue_media')) { wp_enqueue_media(); }
             $val = esc_url(get_option('p116bd_hero_image_url', ''));
-            echo '<input type="url" class="regular-text" name="p116bd_hero_image_url" value="' . $val . '" placeholder="https://.../image.jpg" />';
+            // Use text to allow relative paths like /wp-content/uploads/... which we will normalize on render.
+            echo '<input type="text" id="p116bd_hero_image_url" class="regular-text" name="p116bd_hero_image_url" value="' . $val . '" placeholder="https://.../image.jpg or /wp-content/uploads/....png" /> ';
+            echo '<button type="button" class="button" id="p116bd_hero_image_browse">' . esc_html__('Browse', 'post116-business-directory') . '</button>';
             echo '<p class="description">' . esc_html__('Shown behind the menu, full-bleed. Recommended 1920x675.', 'post116-business-directory') . '</p>';
+            echo '<script>(function(){
+              var b = document.getElementById("p116bd_hero_image_browse");
+              if(!b) return;
+              var input = document.getElementById("p116bd_hero_image_url");
+              var frame;
+              b.addEventListener("click", function(e){
+                e.preventDefault();
+                if(frame){ frame.open(); return; }
+                frame = wp.media({ title: "' . esc_js(__('Select Image', 'post116-business-directory')) . '", button: { text: "' . esc_js(__('Use this image', 'post116-business-directory')) . '" }, library:{ type:"image" }, multiple:false });
+                frame.on("select", function(){ var att = frame.state().get("selection").first().toJSON(); if(att && att.url){ input.value = att.url; } });
+                frame.open();
+              });
+            })();</script>';
         }, 'p116bd', 'p116bd_main');
 
         add_settings_field('p116bd_hero_title', __('Directory Hero Small Title (H1)', 'post116-business-directory'), function(){

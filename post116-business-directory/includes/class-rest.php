@@ -93,7 +93,8 @@ class REST {
 
     public static function contact_business(WP_REST_Request $req) {
         $post_id = absint($req->get_param('post_id'));
-        if (!$post_id || get_post_type($post_id) !== CPT::POST_TYPE) {
+        $post = $post_id ? get_post($post_id) : null;
+        if (!$post || $post->post_type !== CPT::POST_TYPE || get_post_status($post_id) !== 'publish' || !empty($post->post_password)) {
             return new WP_REST_Response(['error' => 'Invalid business.'], 400);
         }
         // Basic rate limiting (per IP and globally) to reduce abuse

@@ -23,6 +23,10 @@ class Loader {
     public static function activate() {
         // Register first to ensure rewrites exist before flush.
         self::init();
+        // Set initial defaults for hero/banner if not present
+        add_option('p116bd_hero_image_url', 'https://alpost116nc2.wpenginepowered.com/wp-content/uploads/2024/05/ALP116_MastheadImage_Legionnaire_1920x675.png');
+        add_option('p116bd_hero_title', __('Business Directory', 'post116-business-directory'));
+        add_option('p116bd_hero_subtitle', __('Member-owned and affiliate businesses', 'post116-business-directory'));
         // Create directory page with block if missing.
         self::maybe_create_directory_page();
         // Add useful DB indexes.

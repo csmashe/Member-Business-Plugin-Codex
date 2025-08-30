@@ -91,6 +91,22 @@
 
 <script>
 (function(){
+  // Ensure labels are available even if localized script loads later
+  window.p116bdLabels = window.p116bdLabels || {
+    name: '<?php echo esc_js(__('Name', 'post116-business-directory')); ?>',
+    role: '<?php echo esc_js(__('Role', 'post116-business-directory')); ?>',
+    email: '<?php echo esc_js(__('Email', 'post116-business-directory')); ?>',
+    phone: '<?php echo esc_js(__('Phone', 'post116-business-directory')); ?>',
+    website: '<?php echo esc_js(__('Website', 'post116-business-directory')); ?>',
+    ownership: '<?php echo esc_js(__('— Ownership —', 'post116-business-directory')); ?>',
+    veteran: '<?php echo esc_js(__('Veteran', 'post116-business-directory')); ?>',
+    sal: '<?php echo esc_js(__('SAL', 'post116-business-directory')); ?>',
+    auxiliary: '<?php echo esc_js(__('Auxiliary', 'post116-business-directory')); ?>',
+    link_label: '<?php echo esc_js(__('Label', 'post116-business-directory')); ?>',
+    link_url: '<?php echo esc_js(__('URL', 'post116-business-directory')); ?>',
+    mediaSelectLogo: '<?php echo esc_js(__('Select Logo', 'post116-business-directory')); ?>',
+    mediaUseLogo: '<?php echo esc_js(__('Use this logo', 'post116-business-directory')); ?>',
+  };
   function addRow(container, type){
     const rows = container.querySelector('.p116bd-rows');
     let row;
@@ -98,16 +114,16 @@
       row = document.createElement('div');
       row.className = 'p116bd-row';
       row.innerHTML = '\
-<input type="text" name="p116bd_owner_name[]" placeholder="Name"/>\
-<input type="text" name="p116bd_owner_role[]" placeholder="Role"/>\
-<input type="email" name="p116bd_owner_email[]" placeholder="Email"/>\
-<input type="text" name="p116bd_owner_phone[]" placeholder="Phone"/>\
-<input type="url" name="p116bd_owner_website[]" placeholder="Website"/>\
+<input type="text" name="p116bd_owner_name[]" placeholder="' + p116bdLabels.name + '"/>\
+<input type="text" name="p116bd_owner_role[]" placeholder="' + p116bdLabels.role + '"/>\
+<input type="email" name="p116bd_owner_email[]" placeholder="' + p116bdLabels.email + '"/>\
+<input type="text" name="p116bd_owner_phone[]" placeholder="' + p116bdLabels.phone + '"/>\
+<input type="url" name="p116bd_owner_website[]" placeholder="' + p116bdLabels.website + '"/>\
 <select name="p116bd_owner_affil[]">\
-  <option value=""><?php echo esc_js(__('— Ownership —', 'post116-business-directory')); ?></option>\
-  <option value="veteran"><?php echo esc_js(__('Veteran', 'post116-business-directory')); ?></option>\
-  <option value="sal"><?php echo esc_js(__('SAL', 'post116-business-directory')); ?></option>\
-  <option value="auxiliary"><?php echo esc_js(__('Auxiliary', 'post116-business-directory')); ?></option>\
+  <option value="">' + p116bdLabels.ownership + '</option>\
+  <option value="veteran">' + p116bdLabels.veteran + '</option>\
+  <option value="sal">' + p116bdLabels.sal + '</option>\
+  <option value="auxiliary">' + p116bdLabels.auxiliary + '</option>\
 </select>\
 <button type="button" class="button p116bd-remove">&times;</button>';
     } else if(type==='links'){
@@ -115,8 +131,8 @@
       row.className = 'p116bd-row';
       row.style.gridTemplateColumns = '2fr 3fr auto';
       row.innerHTML = '\
-<input type="text" name="p116bd_link_label[]" placeholder="Label"/>\
-<input type="url" name="p116bd_link_url[]" placeholder="URL"/>\
+<input type="text" name="p116bd_link_label[]" placeholder="' + p116bdLabels.link_label + '"/>\
+<input type="url" name="p116bd_link_url[]" placeholder="' + p116bdLabels.link_url + '"/>\
 <button type="button" class="button p116bd-remove">&times;</button>';
     }
     rows.appendChild(row);
@@ -161,8 +177,8 @@
     e.preventDefault();
     if(p116bdLogoFrame){ p116bdLogoFrame.open(); return; }
     p116bdLogoFrame = wp.media({
-      title: 'Select Logo',
-      button: { text: 'Use this logo' },
+      title: p116bdLabels.mediaSelectLogo,
+      button: { text: p116bdLabels.mediaUseLogo },
       library: { type: 'image' },
       multiple: false
     });

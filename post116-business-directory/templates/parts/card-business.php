@@ -8,7 +8,17 @@ $title = get_the_title($id);
 $permalink = get_permalink($id);
 $city = get_post_meta($id, 'city', true);
 $phone = get_post_meta($id, 'business_phone', true);
-$owners = (array)get_post_meta($id, 'owners', true);
+$owners_meta = get_post_meta($id, 'owners', true);
+$owners = [];
+if (is_array($owners_meta)) {
+    foreach ($owners_meta as $o) {
+        if (!is_array($o)) { continue; }
+        $owners[] = [
+            'owner_name'  => isset($o['owner_name']) ? (string)$o['owner_name'] : '',
+            'owner_affil' => isset($o['owner_affil']) ? (string)$o['owner_affil'] : '',
+        ];
+    }
+}
 $flags = ['veteran'=>false,'sal'=>false,'auxiliary'=>false];
 foreach ($owners as $o) {
     $aff = $o['owner_affil'] ?? '';
@@ -34,7 +44,7 @@ foreach ($owners as $o) {
       </div>
       <?php if (!empty($owners)): ?>
       <div class="p116bd-card__owners">
-        <?php echo esc_html(implode(', ', array_map(function($o){ return $o['owner_name'] ?? '';}, array_slice($owners, 0, 2)))); ?>
+        <?php echo esc_html(implode(', ', array_map(function($o){ return isset($o['owner_name']) ? (string)$o['owner_name'] : '';}, array_slice($owners, 0, 2)))); ?>
       </div>
       <?php endif; ?>
       <div class="p116bd-card__excerpt"><?php echo esc_html(get_the_excerpt($id)); ?></div>

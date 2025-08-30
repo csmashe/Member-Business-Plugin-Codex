@@ -3,6 +3,7 @@ use P116BD\CPT;
 use P116BD\CPT as CPTClass;
 if (!defined('ABSPATH')) { exit; }
 $id = $args['id'] ?? get_the_ID();
+$logo_id = (int) get_post_meta($id, 'business_logo_id', true);
 $title = get_the_title($id);
 $permalink = get_permalink($id);
 $city = get_post_meta($id, 'city', true);
@@ -15,7 +16,15 @@ if (get_post_meta($id, 'auxiliary_owned', true)) $flags[] = __('Auxiliary', 'pos
 ?>
 <article class="p116bd-card">
   <a class="p116bd-card__link" href="<?php echo esc_url($permalink); ?>">
-    <div class="p116bd-card__media"><?php echo get_the_post_thumbnail($id, 'medium'); ?></div>
+    <div class="p116bd-card__media">
+      <?php
+        if ($logo_id) {
+            echo wp_get_attachment_image($logo_id, 'medium');
+        } else {
+            echo get_the_post_thumbnail($id, 'medium');
+        }
+      ?>
+    </div>
     <div class="p116bd-card__body">
       <h3 class="p116bd-card__title"><?php echo esc_html($title); ?></h3>
       <?php if (!empty($flags)): ?>

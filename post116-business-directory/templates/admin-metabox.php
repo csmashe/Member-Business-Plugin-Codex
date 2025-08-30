@@ -28,6 +28,18 @@
 
 <h3><?php esc_html_e('Contact', 'post116-business-directory'); ?></h3>
 <div class="p116bd-grid-2">
+  <p>
+    <label><?php esc_html_e('Business Logo', 'post116-business-directory'); ?><br/>
+      <input type="hidden" id="p116bd_business_logo_id" name="p116bd_business_logo_id" value="<?php echo esc_attr($fields['business_logo_id']); ?>" />
+      <div id="p116bd_logo_preview" style="margin:6px 0;">
+        <?php if (!empty($fields['business_logo_id'])): ?>
+          <?php echo wp_get_attachment_image((int)$fields['business_logo_id'], 'medium'); ?>
+        <?php endif; ?>
+      </div>
+      <button type="button" class="button" id="p116bd_logo_select"><?php esc_html_e('Select Logo', 'post116-business-directory'); ?></button>
+      <button type="button" class="button" id="p116bd_logo_remove" <?php echo empty($fields['business_logo_id']) ? 'style="display:none"' : ''; ?>><?php esc_html_e('Remove', 'post116-business-directory'); ?></button>
+    </label>
+  </p>
   <p><label><?php esc_html_e('Business Phone', 'post116-business-directory'); ?><br/>
     <input type="text" name="p116bd_business_phone" value="<?php echo esc_attr($fields['business_phone']); ?>"/></label></p>
   <p><label><?php esc_html_e('Business Email', 'post116-business-directory'); ?><br/>
@@ -117,6 +129,46 @@
       row.parentNode.removeChild(row);
     }
   });
+
+  // Media uploader for Logo
+  let p116bdLogoFrame;
+  function setLogo(id){
+    const input = document.getElementById('p116bd_business_logo_id');
+    const preview = document.getElementById('p116bd_logo_preview');
+    const removeBtn = document.getElementById('p116bd_logo_remove');
+    input.value = id || '';
+    if(id){
+      wp.media.attachment(id).fetch().then(function(){
+        const img = wp.media.attachment(id).get('sizes');
+        // Fallback to full if no medium
+        const url = (img && img.medium ? img.medium.url : wp.media.attachment(id).get('url'));
+        preview.innerHTML = '<img src="'+url+'" style="max-width:100%;height:auto;" />';
+      });
+      removeBtn.style.display = '';
+    } else {
+      preview.innerHTML = '';
+      removeBtn.style.display = 'none';
+    }
+  }
+  document.getElementById('p116bd_logo_select').addEventListener('click', function(e){
+    e.preventDefault();
+    if(p116bdLogoFrame){ p116bdLogoFrame.open(); return; }
+    p116bdLogoFrame = wp.media({
+      title: 'Select Logo',
+      button: { text: 'Use this logo' },
+      library: { type: 'image' },
+      multiple: false
+    });
+    p116bdLogoFrame.on('select', function(){
+      const selection = p116bdLogoFrame.state().get('selection');
+      const att = selection.first();
+      if(att){ setLogo(att.id); }
+    });
+    p116bdLogoFrame.open();
+  });
+  document.getElementById('p116bd_logo_remove').addEventListener('click', function(e){
+    e.preventDefault();
+    setLogo('');
+  });
 })();
 </script>
-

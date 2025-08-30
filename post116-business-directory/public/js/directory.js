@@ -28,18 +28,38 @@
     } catch(_) { return {}; }
   }
 
-  function renderCard(item){
-    const wrap = h('div', {className:'p116bd-card'});
-    const a = h('a', {className:'p116bd-card__link', href:item.permalink});
-    a.appendChild(h('h3', {className:'p116bd-card__title', textContent:item.title}));
-    if (item.city || item.phone) {
-      const meta = h('div', {className:'p116bd-card__meta'});
-      if (item.city) meta.appendChild(h('span', {className:'p116bd-city', textContent:item.city}));
-      if (item.phone) meta.appendChild(h('span', {className:'p116bd-phone', textContent:item.phone}));
-      a.appendChild(meta);
+  function renderRow(item){
+    const row = h('div', {className:'p116bd-row'});
+    // Logo column
+    const logoCol = h('div', {className:'p116bd-row__logo'});
+    if (item.logo) {
+      const img = new Image();
+      img.src = item.logo;
+      img.alt = item.title + ' logo';
+      logoCol.appendChild(img);
+    } else {
+      logoCol.appendChild(h('div', {className:'p116bd-logo--placeholder'}));
     }
-    wrap.appendChild(a);
-    return wrap;
+    row.appendChild(logoCol);
+
+    // Info column
+    const info = h('div', {className:'p116bd-row__info'});
+    const title = h('h3', {className:'p116bd-row__title'});
+    try { title.style.setProperty('font-size','21px','important'); } catch(_) {}
+    const a = h('a', {href:item.permalink, textContent:item.title});
+    title.appendChild(a);
+    info.appendChild(title);
+
+    const meta = h('div', {className:'p116bd-row__meta'});
+    if (item.owner) meta.appendChild(h('span', {className:'p116bd-owner', textContent:item.owner}));
+    if (item.phone) meta.appendChild(h('span', {className:'p116bd-phone', textContent:item.phone}));
+    info.appendChild(meta);
+
+    if (item.services) {
+      info.appendChild(h('div', {className:'p116bd-row__services', textContent:item.services}));
+    }
+    row.appendChild(info);
+    return row;
   }
 
   function renderResults(root, res){
@@ -53,8 +73,13 @@
       (groups[key] ||= []).push(it);
     });
     Object.keys(groups).sort((a,b)=>a.localeCompare(b)).forEach(cat => {
-      const h = document.createElement('h3'); h.textContent = cat; grid.appendChild(h);
-      groups[cat].sort((a,b)=>a.title.localeCompare(b.title)).forEach(item => grid.appendChild(renderCard(item)));
+      const section = h('section', {className:'p116bd-category'});
+      const head = h('h2', {className:'p116bd-category__title', textContent:cat});
+      section.appendChild(head);
+      const list = h('div', {className:'p116bd-list'});
+      groups[cat].sort((a,b)=>a.title.localeCompare(b.title)).forEach(item => list.appendChild(renderRow(item)));
+      section.appendChild(list);
+      grid.appendChild(section);
     });
     const legal = qs(root, '.p116bd-legal');
     const resultsEl = qs(root, '.p116bd-results');

@@ -13,6 +13,8 @@ class Meta {
     public static function enqueue_admin($hook) {
         global $post_type;
         if (($hook === 'post-new.php' || $hook === 'post.php') && $post_type === CPT::POST_TYPE) {
+            // Needed for media uploader (logo field)
+            if (function_exists('wp_enqueue_media')) { wp_enqueue_media(); }
             wp_enqueue_script('p116bd-meta', P116BD_PLUGIN_URL . 'public/js/meta.js', ['jquery'], P116BD_VERSION, true);
             wp_enqueue_style('p116bd-admin', P116BD_PLUGIN_URL . 'public/css/admin.css', [], P116BD_VERSION);
         }
@@ -34,6 +36,7 @@ class Meta {
             'business_phone' => $get('business_phone'),
             'business_email' => $get('business_email'),
             'website_url'    => $get('website_url'),
+            'business_logo_id' => $get('business_logo_id'),
             'city'           => $get('city'),
             'address1'       => $get('address1'),
             'address2'       => $get('address2'),
@@ -111,6 +114,7 @@ class Meta {
             'business_phone' => 'p116bd_business_phone',
             'business_email' => 'p116bd_business_email',
             'website_url'    => 'p116bd_website_url',
+            'business_logo_id' => 'p116bd_business_logo_id',
             'city'           => 'p116bd_city',
             'address1'       => 'p116bd_address1',
             'address2'       => 'p116bd_address2',
@@ -126,6 +130,9 @@ class Meta {
                     break;
                 case 'website_url':
                     $val = esc_url_raw($raw);
+                    break;
+                case 'business_logo_id':
+                    $val = absint($raw);
                     break;
                 case 'services_offered':
                     $val = sanitize_textarea_field($raw);

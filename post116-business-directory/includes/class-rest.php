@@ -156,6 +156,17 @@ class REST {
         $owners = (array)get_post_meta($id, 'owners', true);
         $links = (array)get_post_meta($id, 'links', true);
         $cats = get_the_terms($id, CPT::TAXONOMY);
+        $logo_id = (int) get_post_meta($id, 'business_logo_id', true);
+        if (!$logo_id) {
+            $thumb_id = get_post_thumbnail_id($id);
+            if ($thumb_id) { $logo_id = (int)$thumb_id; }
+        }
+        $logo_url = $logo_id ? wp_get_attachment_image_url($logo_id, 'medium') : '';
+        $services = (string)get_post_meta($id, 'services_offered', true);
+        $first_owner = '';
+        if (!empty($owners) && is_array($owners)) {
+            $first_owner = $owners[0]['owner_name'] ?? '';
+        }
         return [
             'id' => $id,
             'title' => get_the_title($id),
@@ -174,6 +185,9 @@ class REST {
                 'url' => $l['link_url'] ?? '',
             ];}, $links)),
             'categories' => $cats && !is_wp_error($cats) ? array_values(wp_list_pluck($cats, 'name')) : [],
+            'logo' => (string)$logo_url,
+            'services' => $services,
+            'owner' => $first_owner,
         ];
     }
 }

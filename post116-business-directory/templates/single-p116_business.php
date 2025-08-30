@@ -2,6 +2,7 @@
 if (!defined('ABSPATH')) { exit; }
 get_header();
 $id = get_the_ID();
+$logo_id = (int) get_post_meta($id, 'business_logo_id', true);
 $owners = (array)get_post_meta($id, 'owners', true);
 $links = (array)get_post_meta($id, 'links', true);
 ?>
@@ -16,7 +17,15 @@ $links = (array)get_post_meta($id, 'links', true);
       </div>
     </header>
     <div class="p116bd-single__grid">
-      <div class="p116bd-single__media"><?php the_post_thumbnail('large'); ?></div>
+      <div class="p116bd-single__media">
+        <?php
+          if ($logo_id) {
+              echo wp_get_attachment_image($logo_id, 'large');
+          } else {
+              the_post_thumbnail('large');
+          }
+        ?>
+      </div>
       <div class="p116bd-single__details">
         <ul class="p116bd-list">
           <?php $phone = get_post_meta($id, 'business_phone', true); if ($phone): ?>
@@ -74,4 +83,3 @@ $links = (array)get_post_meta($id, 'links', true);
   </article>
 </main>
 <?php get_footer(); ?>
-

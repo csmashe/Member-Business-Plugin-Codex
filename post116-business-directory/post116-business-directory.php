@@ -3,7 +3,9 @@
  * Plugin Name: Post 116 Business Directory
  * Description: Business directory for American Legion Post 116 with categories, owners, search, and templates.
  * Version: 1.0.3
- * Author: Post 116
+ * Author: Chris Smashe
+ * Plugin URI: https://github.com/csmashe/Member-Business-Plugin
+ * Author URI: https://excelontheweb.com/
  * Text Domain: post116-business-directory
  * Domain Path: /languages
  */

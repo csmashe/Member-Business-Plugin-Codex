@@ -41,19 +41,26 @@ class REST {
         });
     }
 
+    // debug logging removed
+
     public static function search(WP_REST_Request $req) {
         $q = sanitize_text_field($req->get_param('q'));
         $category = sanitize_text_field($req->get_param('category'));
         $flags = (array)$req->get_param('flags');
         $per_page = max(1, min(50, (int)$req->get_param('per_page')));
         $page = max(1, (int)$req->get_param('page'));
+        global $wpdb;
+        $like_q    = $q !== '' ? '%' . $wpdb->esc_like($q) . '%' : '';
+        $like_q_lc = $q !== '' ? '%' . $wpdb->esc_like(strtolower($q)) . '%' : '';
 
         $meta_query = [ 'relation' => 'AND', [ 'key' => 'show_in_directory', 'value' => '1' ] ];
         if ($q) {
             $meta_query[] = [
                 'relation' => 'OR',
-                ['key' => 'owners_search', 'value' => strtolower($q), 'compare' => 'LIKE'],
-                ['key' => 'city_search',   'value' => strtolower($q), 'compare' => 'LIKE'],
+                ['key' => 'owners_search',     'value' => $like_q_lc, 'compare' => 'LIKE'],
+                ['key' => 'owners',            'value' => $like_q,    'compare' => 'LIKE'],
+                ['key' => 'city_search',       'value' => $like_q_lc, 'compare' => 'LIKE'],
+                ['key' => 'services_offered',  'value' => $like_q,    'compare' => 'LIKE'],
             ];
         }
         foreach (['veteran_owned','sons_owned','auxiliary_owned'] as $flag) {
@@ -71,23 +78,74 @@ class REST {
             ];
         }
 
-        $query = new WP_Query([
+        $query_args = [
             'post_type' => CPT::POST_TYPE,
             'post_status' => 'publish',
-            's' => $q,
             'meta_query' => $meta_query,
             'tax_query' => $tax_query,
             'posts_per_page' => $per_page,
             'paged' => $page,
             'orderby' => 'title',
             'order' => 'ASC',
-        ]);
+        ];
+        $query = new WP_Query($query_args);
 
+        // Primary results
         $items = array_map([__CLASS__, 'format_item'], $query->posts);
+        $total = (int)$query->found_posts;
+        $pages = (int)$query->max_num_pages;
+
+        // Fallback: if search term provided but no results, do a broader pass and filter in PHP
+        if ($q && $total === 0) {
+            $broad_meta = [ 'relation' => 'AND', [ 'key' => 'show_in_directory', 'value' => '1' ] ];
+            foreach (['veteran_owned','sons_owned','auxiliary_owned'] as $flag) {
+                if (in_array($flag, $flags, true)) {
+                    $broad_meta[] = ['key' => $flag, 'value' => '1'];
+                }
+            }
+            $broad_args = [
+                'post_type' => CPT::POST_TYPE,
+                'post_status' => 'publish',
+                'meta_query' => $broad_meta,
+                'tax_query' => $tax_query,
+                'posts_per_page' => 200,
+                'orderby' => 'title',
+                'order' => 'ASC',
+                'no_found_rows' => true,
+            ];
+            $broad = new WP_Query($broad_args);
+            $q_lc = strtolower($q);
+            $filtered = [];
+            foreach ($broad->posts as $p) {
+                $pid = $p->ID;
+                $title = strtolower(get_the_title($pid));
+                $owners = (array) get_post_meta($pid, 'owners', true);
+                $services = strtolower((string) get_post_meta($pid, 'services_offered', true));
+                $city = strtolower((string) get_post_meta($pid, 'city', true));
+                $hit = false;
+                if (strpos($title, $q_lc) !== false) { $hit = true; }
+                if (!$hit && $services !== '' && strpos($services, $q_lc) !== false) { $hit = true; }
+                if (!$hit && $city !== '' && strpos($city, $q_lc) !== false) { $hit = true; }
+                if (!$hit && !empty($owners)) {
+                    foreach ($owners as $o) {
+                        if (!is_array($o)) continue;
+                        $name = strtolower($o['owner_name'] ?? '');
+                        if ($name !== '' && strpos($name, $q_lc) !== false) { $hit = true; break; }
+                    }
+                }
+                if ($hit) { $filtered[] = $p; }
+            }
+            $total = count($filtered);
+            $pages = (int) ceil($total / $per_page);
+            $offset = ($page - 1) * $per_page;
+            $slice = array_slice($filtered, $offset, $per_page);
+            $items = array_map([__CLASS__, 'format_item'], $slice);
+        }
+
         return new WP_REST_Response([
             'items' => $items,
-            'total' => (int)$query->found_posts,
-            'pages' => (int)$query->max_num_pages,
+            'total' => $total,
+            'pages' => $pages,
         ]);
     }
 
@@ -200,14 +258,18 @@ class REST {
             $suggestions[] = ['type' => 'business', 'label' => $p->post_title, 'slug' => $p->post_name];
         }
 
-        // Owners
+        // Owners and services_offered
         $owner_posts = get_posts([
             'post_type' => CPT::POST_TYPE,
             'posts_per_page' => $limit,
             'meta_query' => [
                 'relation' => 'AND',
                 ['key' => 'show_in_directory', 'value' => '1'],
-                ['key' => 'owners_search', 'value' => strtolower($q), 'compare' => 'LIKE']
+                [
+                    'relation' => 'OR',
+                    ['key' => 'owners_search', 'value' => strtolower($q), 'compare' => 'LIKE'],
+                    ['key' => 'services_offered', 'value' => $q, 'compare' => 'LIKE'],
+                ]
             ],
             'post_status' => 'publish',
         ]);
@@ -219,6 +281,10 @@ class REST {
                 if ($name !== '' && strpos(strtolower($name), $q_lc) !== false) {
                     $suggestions[] = ['type' => 'owner', 'label' => $o['owner_name'], 'slug' => $p->post_name];
                 }
+            }
+            $svc = (string) get_post_meta($p->ID, 'services_offered', true);
+            if ($svc !== '' && stripos($svc, $q) !== false) {
+                $suggestions[] = ['type' => 'service', 'label' => get_the_title($p->ID), 'slug' => $p->post_name];
             }
         }
 

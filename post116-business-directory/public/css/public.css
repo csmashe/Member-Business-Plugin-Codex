@@ -69,6 +69,12 @@
 .p116bd-legal{margin-top:12px;font-size:12px;color:#555}
 .p116bd-single .p116bd-list{list-style:none;padding:0}
 
+/* Mobile adjustments */
+@media (max-width: 768px){
+  .p116bd-hero__kicker{ text-align:center !important; }
+  .p116bd-directory{ padding:10px !important; }
+}
+
 /* Single-page placeholder and modal */
 .p116bd-single__media .p116bd-logo--placeholder{width:100%;max-width:320px;height:320px;background:#fafafa;border:1px solid #eee;border-radius:8px}
 .p116bd-modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);z-index:1000}

@@ -78,6 +78,7 @@ class Loader {
         $indexes = [
             'p116bd_owners_search' => "(meta_key(32), meta_value(191))",
             'p116bd_city_search'   => "(meta_key(32), meta_value(191))",
+            'p116bd_services_offered' => "(meta_key(32), meta_value(191))",
         ];
         foreach ($indexes as $name => $cols) {
             $exists = $wpdb->get_var($wpdb->prepare(

@@ -57,7 +57,7 @@
 .p116bd-badge{display:inline-flex;align-items:center;gap:6px;background:#eef;border:1px solid #dde;padding:2px 6px;margin-right:6px;border-radius:3px;font-size:12px}
 .p116bd-badge .p116bd-flag-icon{width:14px;height:14px}
 .p116bd-row__emblems{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-self:flex-start}
-.p116bd-row__emblems .p116bd-flag-icon{height:40px;width:auto}
+.p116bd-row__emblems .p116bd-flag-icon{height:35px;width:auto}
 .p116bd-pagination{margin-top:16px}
 .p116bd-pagination .p116bd-page{margin-right:6px;padding:6px 10px}
 .p116bd-pagination .p116bd-page:focus{outline:none;box-shadow:0 0 0 3px #005fcc}
@@ -65,3 +65,16 @@
 .p116bd-pagination .p116bd-page:focus-visible{outline:none;box-shadow:0 0 0 3px #005fcc}
 .p116bd-legal{margin-top:12px;font-size:12px;color:#555}
 .p116bd-single .p116bd-list{list-style:none;padding:0}
+
+/* Single-page placeholder and modal */
+.p116bd-single__media .p116bd-logo--placeholder{width:100%;max-width:320px;height:320px;background:#fafafa;border:1px solid #eee;border-radius:8px}
+.p116bd-modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);z-index:1000}
+.p116bd-modal.is-open{display:flex}
+.p116bd-modal__dialog{background:#fff;border-radius:10px;min-width:320px;max-width:640px;width:92vw;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,0.3)}
+.p116bd-modal__header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.p116bd-modal__title{font-size:22px;margin:0}
+.p116bd-modal__close{background:none;border:none;font-size:22px;cursor:pointer}
+.p116bd-form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.p116bd-form .full{grid-column:1/-1}
+.p116bd-form input,.p116bd-form textarea{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px}
+.p116bd-form button[type=submit]{margin-top:8px}

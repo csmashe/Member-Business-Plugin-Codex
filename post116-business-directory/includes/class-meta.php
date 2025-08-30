@@ -76,6 +76,7 @@ class Meta {
         $owner_emails = (array) (isset($_POST['p116bd_owner_email']) ? wp_unslash($_POST['p116bd_owner_email']) : []);
         $owner_phones = (array) (isset($_POST['p116bd_owner_phone']) ? wp_unslash($_POST['p116bd_owner_phone']) : []);
         $owner_sites  = (array) (isset($_POST['p116bd_owner_website']) ? wp_unslash($_POST['p116bd_owner_website']) : []);
+        $owner_affil  = (array) (isset($_POST['p116bd_owner_affil']) ? wp_unslash($_POST['p116bd_owner_affil']) : []);
         if (!empty($owner_names)) {
             $count = count($owner_names);
             for ($i = 0; $i < $count; $i++) {
@@ -87,6 +88,7 @@ class Meta {
                     'owner_email'  => sanitize_email($owner_emails[$i] ?? ''),
                     'owner_phone'  => sanitize_text_field($owner_phones[$i] ?? ''),
                     'owner_website'=> esc_url_raw($owner_sites[$i] ?? ''),
+                    'owner_affil'  => in_array(($owner_affil[$i] ?? ''), ['veteran','sal','auxiliary'], true) ? ($owner_affil[$i]) : '',
                 ];
             }
         }
@@ -144,10 +146,18 @@ class Meta {
             update_post_meta($post_id, $meta_key, $val);
         }
 
-        // Flags and visibility
-        update_post_meta($post_id, 'veteran_owned', !empty($_POST['p116bd_veteran_owned']) ? '1' : '0');
-        update_post_meta($post_id, 'sons_owned', !empty($_POST['p116bd_sons_owned']) ? '1' : '0');
-        update_post_meta($post_id, 'auxiliary_owned', !empty($_POST['p116bd_auxiliary_owned']) ? '1' : '0');
+        // Derive aggregate flags from owners' affiliation
+        $has_vet = false; $has_sal = false; $has_aux = false;
+        foreach ($owners as $o) {
+            switch ($o['owner_affil'] ?? '') {
+                case 'veteran': $has_vet = true; break;
+                case 'sal': $has_sal = true; break;
+                case 'auxiliary': $has_aux = true; break;
+            }
+        }
+        update_post_meta($post_id, 'veteran_owned', $has_vet ? '1' : '0');
+        update_post_meta($post_id, 'sons_owned', $has_sal ? '1' : '0');
+        update_post_meta($post_id, 'auxiliary_owned', $has_aux ? '1' : '0');
         update_post_meta($post_id, 'show_in_directory', !empty($_POST['p116bd_show_in_directory']) ? '1' : '0');
 
         // Search helpers

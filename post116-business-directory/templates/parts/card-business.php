@@ -9,10 +9,11 @@ $permalink = get_permalink($id);
 $city = get_post_meta($id, 'city', true);
 $phone = get_post_meta($id, 'business_phone', true);
 $owners = (array)get_post_meta($id, 'owners', true);
-$flags = [];
-if (get_post_meta($id, 'veteran_owned', true)) $flags[] = __('Veteran', 'post116-business-directory');
-if (get_post_meta($id, 'sons_owned', true)) $flags[] = __('SAL', 'post116-business-directory');
-if (get_post_meta($id, 'auxiliary_owned', true)) $flags[] = __('Auxiliary', 'post116-business-directory');
+$flags = ['veteran'=>false,'sal'=>false,'auxiliary'=>false];
+foreach ($owners as $o) {
+    $aff = $o['owner_affil'] ?? '';
+    if (isset($flags[$aff])) $flags[$aff] = true;
+}
 ?>
 <article class="p116bd-card">
   <a class="p116bd-card__link" href="<?php echo esc_url($permalink); ?>">
@@ -27,11 +28,6 @@ if (get_post_meta($id, 'auxiliary_owned', true)) $flags[] = __('Auxiliary', 'pos
     </div>
     <div class="p116bd-card__body">
       <h3 class="p116bd-card__title"><?php echo esc_html($title); ?></h3>
-      <?php if (!empty($flags)): ?>
-      <div class="p116bd-card__flags">
-        <?php foreach ($flags as $f): ?><span class="p116bd-badge"><?php echo esc_html($f); ?></span><?php endforeach; ?>
-      </div>
-      <?php endif; ?>
       <div class="p116bd-card__meta">
         <?php if ($city): ?><span class="p116bd-city"><?php echo esc_html($city); ?></span><?php endif; ?>
         <?php if ($phone): ?><span class="p116bd-phone"><?php echo esc_html(CPTClass::format_phone($phone)); ?></span><?php endif; ?>
@@ -42,6 +38,13 @@ if (get_post_meta($id, 'auxiliary_owned', true)) $flags[] = __('Auxiliary', 'pos
       </div>
       <?php endif; ?>
       <div class="p116bd-card__excerpt"><?php echo esc_html(get_the_excerpt($id)); ?></div>
+      <?php if ($flags['veteran'] || $flags['sal'] || $flags['auxiliary']): ?>
+        <div class="p116bd-row__emblems">
+          <?php if ($flags['veteran']): ?><img class="p116bd-flag-icon" alt="<?php esc_attr_e('American Legion', 'post116-business-directory'); ?>" src="<?php echo esc_url(\P116BD\P116BD_PLUGIN_URL . 'public/icons/TAL-emblem-full-detail-RGB.png'); ?>" /><?php endif; ?>
+          <?php if ($flags['sal']): ?><img class="p116bd-flag-icon" alt="<?php esc_attr_e('SAL', 'post116-business-directory'); ?>" src="<?php echo esc_url(\P116BD\P116BD_PLUGIN_URL . 'public/icons/SAL-Emblem.png'); ?>" /><?php endif; ?>
+          <?php if ($flags['auxiliary']): ?><img class="p116bd-flag-icon" alt="<?php esc_attr_e('Auxiliary', 'post116-business-directory'); ?>" src="<?php echo esc_url(\P116BD\P116BD_PLUGIN_URL . 'public/icons/Auxiliary-Emblem.png'); ?>" /><?php endif; ?>
+        </div>
+      <?php endif; ?>
     </div>
   </a>
   </article>

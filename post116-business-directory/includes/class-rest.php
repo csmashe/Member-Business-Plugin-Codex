@@ -33,6 +33,11 @@ class REST {
                     'limit' => ['type'=>'integer','default'=>8],
                 ],
             ]);
+            register_rest_route(self::NS, '/contact', [
+                'methods'  => 'POST',
+                'callback' => [__CLASS__, 'contact_business'],
+                'permission_callback' => '__return_true',
+            ]);
         });
     }
 
@@ -84,6 +89,96 @@ class REST {
             'total' => (int)$query->found_posts,
             'pages' => (int)$query->max_num_pages,
         ]);
+    }
+
+    public static function contact_business(WP_REST_Request $req) {
+        $post_id = absint($req->get_param('post_id'));
+        if (!$post_id || get_post_type($post_id) !== CPT::POST_TYPE) {
+            return new WP_REST_Response(['error' => 'Invalid business.'], 400);
+        }
+        // Basic rate limiting (per IP and globally) to reduce abuse
+        $ip = isset($_SERVER['HTTP_X_FORWARDED_FOR']) ? sanitize_text_field(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0]) : (isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field($_SERVER['REMOTE_ADDR']) : '0.0.0.0');
+        $ip = substr($ip, 0, 64); // clamp
+        $window = 10 * 60; // 10 minutes
+        $per_post_limit = 3; // max 3 per post per IP per window
+        $global_limit   = 10; // max 10 per IP per window sitewide
+        $k_post   = 'p116bd_rl_post_' . md5($post_id . '|' . $ip);
+        $k_global = 'p116bd_rl_global_' . md5($ip);
+        $c_post   = (int) get_transient($k_post);
+        $c_global = (int) get_transient($k_global);
+        if ($c_post >= $per_post_limit || $c_global >= $global_limit) {
+            return new WP_REST_Response(['error' => 'Rate limit reached. Please try again later.'], 429);
+        }
+        $name = sanitize_text_field($req->get_param('name'));
+        $phone = sanitize_text_field($req->get_param('phone'));
+        $email = sanitize_email($req->get_param('email'));
+        $message = sanitize_textarea_field($req->get_param('message'));
+        if ($name === '' || $message === '') {
+            return new WP_REST_Response(['error' => 'Name and message are required.'], 400);
+        }
+        if ($email !== '' && !is_email($email)) {
+            return new WP_REST_Response(['error' => 'Invalid email.'], 400);
+        }
+        // Require at least one contact method
+        if ($email === '' && $phone === '') {
+            return new WP_REST_Response(['error' => 'Provide phone or email.'], 400);
+        }
+        // reCAPTCHA validation if configured
+        $secret = trim((string) get_option('p116bd_recaptcha_secret', ''));
+        if ($secret !== '') {
+            $token = $req->get_param('g-recaptcha-response') ?: $req->get_param('token');
+            if (!$token) return new WP_REST_Response(['error' => 'Captcha required.'], 400);
+            $resp = wp_remote_post('https://www.google.com/recaptcha/api/siteverify', [
+                'timeout' => 8,
+                'body' => [ 'secret' => $secret, 'response' => $token ]
+            ]);
+            if (is_wp_error($resp)) {
+                return new WP_REST_Response(['error' => 'Captcha verification failed.'], 400);
+            }
+            $data = json_decode(wp_remote_retrieve_body($resp), true);
+            if (empty($data['success'])) {
+                return new WP_REST_Response(['error' => 'Captcha invalid.'], 400);
+            }
+        }
+        // Build allowed recipient set (owners + business email)
+        $allowed = [];
+        $owners = (array) get_post_meta($post_id, 'owners', true);
+        foreach ($owners as $o) {
+            $oe = isset($o['owner_email']) ? sanitize_email($o['owner_email']) : '';
+            if ($oe && is_email($oe)) $allowed[$oe] = true;
+        }
+        $be = sanitize_email((string)get_post_meta($post_id, 'business_email', true));
+        if ($be && is_email($be)) $allowed[$be] = true;
+        if (empty($allowed)) {
+            return new WP_REST_Response(['error' => 'No recipient configured.'], 400);
+        }
+        // Single recipient selection, validated server-side
+        $recipient = sanitize_email((string)$req->get_param('recipient'));
+        if ($recipient === '' || !isset($allowed[$recipient])) {
+            // If client tampers with recipient, reject
+            if ($recipient !== '') {
+                return new WP_REST_Response(['error' => 'Invalid recipient.'], 400);
+            }
+            // Fallback to business email or first allowed
+            $recipient = $be ?: array_key_first($allowed);
+        }
+        $to = $recipient;
+        $subject = sprintf('[Post 116 Directory] Inquiry for %s', get_the_title($post_id));
+        $lines = [];
+        $lines[] = 'From: ' . $name;
+        if ($phone) $lines[] = 'Phone: ' . $phone;
+        if ($email) $lines[] = 'Email: ' . $email;
+        $lines[] = '';
+        $lines[] = $message;
+        $body = implode("\n", $lines);
+        $headers = [];
+        if ($email) $headers[] = 'Reply-To: ' . $email;
+        $sent = wp_mail($to, $subject, $body, $headers);
+        if (!$sent) return new WP_REST_Response(['error' => 'Failed to send.'], 500);
+        // increment counters
+        set_transient($k_post, $c_post + 1, $window);
+        set_transient($k_global, $c_global + 1, $window);
+        return new WP_REST_Response(['ok' => true]);
     }
 
     public static function autocomplete(WP_REST_Request $req) {

@@ -1,8 +1,8 @@
 <?php if (!defined('ABSPATH')) { exit; } ?>
 <style>
 .p116bd-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.p116bd-repeater .p116bd-row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:8px;margin-bottom:8px}
-.p116bd-repeater .p116bd-row input{width:100%}
+.p116bd-repeater .p116bd-row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr auto;gap:8px;margin-bottom:8px}
+.p116bd-repeater .p116bd-row input, .p116bd-repeater .p116bd-row select{width:100%}
 .p116bd-badge{display:inline-block;padding:2px 6px;background:#eee;border-radius:3px;margin-right:4px;font-size:12px}
 </style>
 <?php if (isset($_GET['p116bd_city_required'])): ?>
@@ -12,13 +12,19 @@
 <h3><?php esc_html_e('Owners', 'post116-business-directory'); ?></h3>
 <div class="p116bd-repeater" data-repeater="owners">
   <div class="p116bd-rows">
-  <?php if (!empty($owners)) : foreach ($owners as $o): ?>
+  <?php if (!empty($owners)) : foreach ($owners as $o): $aff = $o['owner_affil'] ?? ''; ?>
     <div class="p116bd-row">
       <input type="text" name="p116bd_owner_name[]" placeholder="<?php esc_attr_e('Name', 'post116-business-directory'); ?>" value="<?php echo esc_attr($o['owner_name'] ?? ''); ?>"/>
       <input type="text" name="p116bd_owner_role[]" placeholder="<?php esc_attr_e('Role', 'post116-business-directory'); ?>" value="<?php echo esc_attr($o['owner_role'] ?? ''); ?>"/>
       <input type="email" name="p116bd_owner_email[]" placeholder="<?php esc_attr_e('Email', 'post116-business-directory'); ?>" value="<?php echo esc_attr($o['owner_email'] ?? ''); ?>"/>
       <input type="text" name="p116bd_owner_phone[]" placeholder="<?php esc_attr_e('Phone', 'post116-business-directory'); ?>" value="<?php echo esc_attr($o['owner_phone'] ?? ''); ?>"/>
       <input type="url" name="p116bd_owner_website[]" placeholder="<?php esc_attr_e('Website', 'post116-business-directory'); ?>" value="<?php echo esc_attr($o['owner_website'] ?? ''); ?>"/>
+      <select name="p116bd_owner_affil[]">
+        <option value="" <?php selected($aff, ''); ?>><?php esc_html_e('— Ownership —', 'post116-business-directory'); ?></option>
+        <option value="veteran" <?php selected($aff, 'veteran'); ?>><?php esc_html_e('Veteran', 'post116-business-directory'); ?></option>
+        <option value="sal" <?php selected($aff, 'sal'); ?>><?php esc_html_e('SAL', 'post116-business-directory'); ?></option>
+        <option value="auxiliary" <?php selected($aff, 'auxiliary'); ?>><?php esc_html_e('Auxiliary', 'post116-business-directory'); ?></option>
+      </select>
       <button type="button" class="button p116bd-remove">&times;</button>
     </div>
   <?php endforeach; endif; ?>
@@ -62,12 +68,7 @@
     <input type="text" name="p116bd_postal_code" value="<?php echo esc_attr($fields['postal_code']); ?>"/></label></p>
 </div>
 
-<h3><?php esc_html_e('Ownership Flags', 'post116-business-directory'); ?></h3>
-<p>
-  <label><input type="checkbox" name="p116bd_veteran_owned" value="1" <?php checked($fields['veteran_owned']); ?>/> <?php esc_html_e('Veteran Owned', 'post116-business-directory'); ?></label>
-  <label><input type="checkbox" name="p116bd_sons_owned" value="1" <?php checked($fields['sons_owned']); ?>/> <?php esc_html_e('Sons of the American Legion', 'post116-business-directory'); ?></label>
-  <label><input type="checkbox" name="p116bd_auxiliary_owned" value="1" <?php checked($fields['auxiliary_owned']); ?>/> <?php esc_html_e('Auxiliary Owned', 'post116-business-directory'); ?></label>
-</p>
+<!-- Ownership flags now derive from per-owner affiliation -->
 
 <h3><?php esc_html_e('Services Offered (short list)', 'post116-business-directory'); ?></h3>
 <p><textarea name="p116bd_services_offered" rows="3" style="width:100%"><?php echo esc_textarea($fields['services_offered']); ?></textarea></p>
@@ -102,6 +103,12 @@
 <input type="email" name="p116bd_owner_email[]" placeholder="Email"/>\
 <input type="text" name="p116bd_owner_phone[]" placeholder="Phone"/>\
 <input type="url" name="p116bd_owner_website[]" placeholder="Website"/>\
+<select name="p116bd_owner_affil[]">\
+  <option value=""><?php echo esc_js(__('— Ownership —', 'post116-business-directory')); ?></option>\
+  <option value="veteran"><?php echo esc_js(__('Veteran', 'post116-business-directory')); ?></option>\
+  <option value="sal"><?php echo esc_js(__('SAL', 'post116-business-directory')); ?></option>\
+  <option value="auxiliary"><?php echo esc_js(__('Auxiliary', 'post116-business-directory')); ?></option>\
+</select>\
 <button type="button" class="button p116bd-remove">&times;</button>';
     } else if(type==='links'){
       row = document.createElement('div');

@@ -27,6 +27,9 @@ class Settings {
         register_setting('p116bd', 'p116bd_hero_image_url', ['type'=>'string', 'default'=>'']);
         register_setting('p116bd', 'p116bd_hero_title', ['type'=>'string', 'default'=>'']);
         register_setting('p116bd', 'p116bd_hero_subtitle', ['type'=>'string', 'default'=>'']);
+        // Contact form (reCAPTCHA)
+        register_setting('p116bd', 'p116bd_recaptcha_site_key', ['type'=>'string', 'default'=>'']);
+        register_setting('p116bd', 'p116bd_recaptcha_secret', ['type'=>'string', 'default'=>'']);
 
         add_settings_section('p116bd_main', __('Directory Settings', 'post116-business-directory'), '__return_false', 'p116bd');
 
@@ -61,6 +64,16 @@ class Settings {
         add_settings_field('p116bd_hero_subtitle', __('Directory Hero Large Heading', 'post116-business-directory'), function(){
             $val = esc_attr(get_option('p116bd_hero_subtitle', ''));
             echo '<input type="text" class="regular-text" name="p116bd_hero_subtitle" value="' . $val . '" placeholder="Member-owned and affiliate businesses" />';
+        }, 'p116bd', 'p116bd_main');
+
+        add_settings_field('p116bd_recaptcha_site_key', __('reCAPTCHA Site Key', 'post116-business-directory'), function(){
+            $val = esc_attr(get_option('p116bd_recaptcha_site_key', ''));
+            echo '<input type="text" class="regular-text" name="p116bd_recaptcha_site_key" value="' . $val . '" placeholder="site key" />';
+        }, 'p116bd', 'p116bd_main');
+
+        add_settings_field('p116bd_recaptcha_secret', __('reCAPTCHA Secret', 'post116-business-directory'), function(){
+            $val = esc_attr(get_option('p116bd_recaptcha_secret', ''));
+            echo '<input type="password" class="regular-text" name="p116bd_recaptcha_secret" value="' . $val . '" placeholder="secret" />';
         }, 'p116bd', 'p116bd_main');
     }
 

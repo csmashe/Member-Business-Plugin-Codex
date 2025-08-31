@@ -34,6 +34,8 @@ class CPT {
             // No content editor; data via meta fields only.
             'supports' => ['title', 'thumbnail', 'revisions'],
             'rewrite' => ['slug' => 'directory', 'with_front' => false],
+            // Use a business-appropriate Dashicon for the admin menu.
+            'menu_icon' => 'dashicons-store',
             'map_meta_cap' => true,
             'capability_type' => [
                 'p116_business',

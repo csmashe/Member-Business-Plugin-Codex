@@ -32,14 +32,16 @@
     const row = h('div', {className:'p116bd-row'});
     // Logo column
     const logoCol = h('div', {className:'p116bd-row__logo'});
+    const logoLink = h('a', {className:'p116bd-logo-link', href:item.permalink, ariaLabel:`View ${item.title}`});
     if (item.logo) {
       const img = new Image();
       img.src = item.logo;
       img.alt = item.title + ' logo';
-      logoCol.appendChild(img);
+      logoLink.appendChild(img);
     } else {
-      logoCol.appendChild(h('div', {className:'p116bd-logo--placeholder'}));
+      logoLink.appendChild(h('div', {className:'p116bd-logo--placeholder'}));
     }
+    logoCol.appendChild(logoLink);
     row.appendChild(logoCol);
 
     // Info column
@@ -88,7 +90,11 @@
     const state = root._p116 || (root._p116 = {});
     state.pages = Number(res.pages || 1);
     const container = grid;
-    if (!append) container.innerHTML = '';
+    if (!append) {
+      container.innerHTML = '';
+      state.catMap = new Map();
+      state.catOrder = [];
+    }
 
     // Clear any previous empty state
     const emptyEl = qs(root, '.p116bd-empty');
@@ -102,21 +108,105 @@
       container.appendChild(msg);
     }
 
-    // Group by first category name and append
+    // Helpers for grouping
+    const norm = (s) => (s || '').toString().trim().replace(/\s+/g,' ');
+    const keyFor = (it, name, _idx) => {
+      // If API provides a single-category row context, prefer it
+      if (it.cat_slug) return it.cat_slug.toString().toLowerCase();
+      return norm(name).toLowerCase();
+    };
+
+    // Build groups: key -> {label, items[]}
     const groups = {};
     items.forEach(it => {
-      const key = (it.categories && it.categories.length ? it.categories[0] : 'Uncategorized');
-      (groups[key] ||= []).push(it);
+      // When server provides per-category rows, group by that; otherwise fallback to all categories
+      if (it.cat_label || it.cat_slug) {
+        const key = (it.cat_slug || norm(it.cat_label)).toString().toLowerCase();
+        const label = it.cat_label || it.categories?.[0] || 'Uncategorized';
+        if (!groups[key]) groups[key] = { label: norm(label), items: [] };
+        groups[key].items.push(it);
+      } else {
+        const names = Array.isArray(it.categories) && it.categories.length ? it.categories : ['Uncategorized'];
+        names.forEach((name, idx) => {
+          const key = keyFor(it, name, idx);
+          if (!groups[key]) groups[key] = { label: norm(name), items: [] };
+          groups[key].items.push(it);
+        });
+      }
     });
-    Object.keys(groups).sort((a,b)=>a.localeCompare(b)).forEach(cat => {
-      const section = h('section', {className:'p116bd-category'});
-      const head = h('h2', {className:'p116bd-category__title', textContent:cat});
-      section.appendChild(head);
-      const list = h('div', {className:'p116bd-list'});
-      groups[cat].sort((a,b)=>a.title.localeCompare(b.title)).forEach(item => list.appendChild(renderRow(item)));
-      section.appendChild(list);
-      container.appendChild(section);
+
+    const orderByLabel = (a, b) => a.label.localeCompare(b.label);
+    const entries = Object.entries(groups).map(([key, val]) => ({ key, label: val.label, items: val.items }));
+    entries.sort(orderByLabel);
+
+    // Init state tracking
+    state.catMap = state.catMap || new Map();
+    state.catOrder = state.catOrder || [];
+    state.catLabels = state.catLabels || new Map();
+
+    // Create or reuse sections per category and append rows, keeping alpha order stable
+    entries.forEach(({key, label, items}) => {
+      let entry = state.catMap.get(key);
+      if (!entry) {
+        const section = h('section', {className:'p116bd-category'});
+        const head = h('h2', {className:'p116bd-category__title', textContent:label});
+        section.appendChild(head);
+        const list = h('div', {className:'p116bd-list'});
+        section.appendChild(list);
+        // Determine insertion index by label
+        const order = state.catOrder;
+        // Store label for this key
+        state.catLabels.set(key, label);
+        let idx = order.findIndex(k => label.localeCompare(state.catLabels.get(k) || '') < 0);
+        if (idx === -1) idx = order.length;
+        order.splice(idx, 0, key);
+        // Insert before the next section in order if it exists; otherwise before sentinel
+        const nextKey = order[idx + 1];
+        const nextEntry = nextKey ? state.catMap.get(nextKey) : null;
+        const sentinel = state.sentinel;
+        if (nextEntry && nextEntry.section && container.contains(nextEntry.section)) {
+          container.insertBefore(section, nextEntry.section);
+        } else if (sentinel && container.contains(sentinel)) {
+          container.insertBefore(section, sentinel);
+        } else {
+          container.appendChild(section);
+        }
+        entry = { section, list, seen: new Set(), items: new Map() };
+        state.catMap.set(key, entry);
+      }
+      const list = entry.list;
+      const seen = entry.seen;
+      const store = entry.items || (entry.items = new Map());
+      // Merge items into store by id
+      items.forEach(item => { if (!seen.has(item.id)) { seen.add(item.id); store.set(item.id, item); } });
+      // Re-render list in alpha order using all collected items
+      list.innerHTML = '';
+      Array.from(store.values())
+        .sort((a,b)=>a.title.localeCompare(b.title))
+        .forEach(item => list.appendChild(renderRow(item)));
     });
+
+    // After ensuring/creating sections, force DOM order to match alphabetical order
+    if (state.catOrder && state.catOrder.length) {
+      const sentinel = state.sentinel;
+      const orderSorted = state.catOrder.slice().sort((ka, kb) => {
+        const la = state.catLabels.get(ka) || '';
+        const lb = state.catLabels.get(kb) || '';
+        return la.localeCompare(lb);
+      });
+      state.catOrder = orderSorted;
+      orderSorted.forEach(k => {
+        const e = state.catMap.get(k);
+        if (e && e.section) {
+          // Move each section in order; append keeps sentinel last
+          if (sentinel && container.contains(sentinel)) {
+            container.insertBefore(e.section, sentinel);
+          } else {
+            container.appendChild(e.section);
+          }
+        }
+      });
+    }
 
     const legal = qs(root, '.p116bd-legal');
     const resultsEl = qs(root, '.p116bd-results');
@@ -137,6 +227,9 @@
     } else if (!container.contains(sent)) {
       container.appendChild(sent);
     }
+
+    // If user is already near bottom (fast scroll), kick the loader once
+    maybeLoadMore(root);
   }
 
   function buildURL(root){
@@ -192,9 +285,25 @@
           doSearch(root, true);
         }
       });
-    }, { rootMargin: '200px 0px' });
+    }, { rootMargin: '800px 0px' });
     io.observe(sent);
     state.observer = io;
+  }
+
+  // Backup loader: if sentinel is already near the viewport after render
+  // (fast scroll), trigger a load without waiting for IO callback.
+  function maybeLoadMore(root){
+    const s = root._p116 || {};
+    if (!s || s.loading) return;
+    if ((s.page || 1) >= (s.pages || 1)) return;
+    const sent = s.sentinel;
+    if (!sent) return;
+    const rect = sent.getBoundingClientRect();
+    const vh = window.innerHeight || document.documentElement.clientHeight || 800;
+    if (rect.top <= vh + 200) {
+      s.page = (s.page || 1) + 1;
+      doSearch(root, true);
+    }
   }
 
   function attach(root){
@@ -237,6 +346,12 @@
         doSearch(root, false);
       }, 250);
     });
+
+    // Fallback: listen to scroll/resize to handle very fast scrolling
+    const onScroll = () => maybeLoadMore(root);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    root._p116._onScroll = onScroll;
     doSearch(root, false);
   }
 

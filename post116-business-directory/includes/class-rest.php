@@ -53,16 +53,11 @@ class REST {
         $like_q    = $q !== '' ? '%' . $wpdb->esc_like($q) . '%' : '';
         $like_q_lc = $q !== '' ? '%' . $wpdb->esc_like(strtolower($q)) . '%' : '';
 
+        // Base visibility + flag filters. We deliberately do NOT filter by $q in SQL,
+        // because the search must match title, category name, owners, or services.
+        // Those fields span post title, taxonomy names, and meta — easier and more
+        // reliable to evaluate together in PHP after fetching.
         $meta_query = [ 'relation' => 'AND', [ 'key' => 'show_in_directory', 'value' => '1' ] ];
-        if ($q) {
-            $meta_query[] = [
-                'relation' => 'OR',
-                ['key' => 'owners_search',     'value' => $like_q_lc, 'compare' => 'LIKE'],
-                ['key' => 'owners',            'value' => $like_q,    'compare' => 'LIKE'],
-                ['key' => 'city_search',       'value' => $like_q_lc, 'compare' => 'LIKE'],
-                ['key' => 'services_offered',  'value' => $like_q,    'compare' => 'LIKE'],
-            ];
-        }
         foreach (['veteran_owned','sons_owned','auxiliary_owned'] as $flag) {
             if (in_array($flag, $flags, true)) {
                 $meta_query[] = ['key' => $flag, 'value' => '1'];
@@ -78,72 +73,93 @@ class REST {
             ];
         }
 
-        $query_args = [
+        // Fetch a broad result set, then expand each post into one row per category,
+        // and sort rows by category name then business title. This guarantees
+        // server-side ordering across pagination and supports multi-category posts.
+        $broad_args = [
             'post_type' => CPT::POST_TYPE,
             'post_status' => 'publish',
             'meta_query' => $meta_query,
             'tax_query' => $tax_query,
-            'posts_per_page' => $per_page,
-            'paged' => $page,
+            'posts_per_page' => 400, // directory scale; adjust if needed
             'orderby' => 'title',
             'order' => 'ASC',
+            'no_found_rows' => true,
         ];
-        $query = new WP_Query($query_args);
-
-        // Primary results
-        $items = array_map([__CLASS__, 'format_item'], $query->posts);
-        $total = (int)$query->found_posts;
-        $pages = (int)$query->max_num_pages;
-
-        // Fallback: if search term provided but no results, do a broader pass and filter in PHP
-        if ($q && $total === 0) {
-            $broad_meta = [ 'relation' => 'AND', [ 'key' => 'show_in_directory', 'value' => '1' ] ];
-            foreach (['veteran_owned','sons_owned','auxiliary_owned'] as $flag) {
-                if (in_array($flag, $flags, true)) {
-                    $broad_meta[] = ['key' => $flag, 'value' => '1'];
+        $broad = new WP_Query($broad_args);
+        $expanded = [];
+        $seen = [];
+        $q_lc = strtolower($q);
+        foreach ($broad->posts as $p) {
+            $base = self::format_item($p);
+            $terms = get_the_terms($p->ID, CPT::TAXONOMY);
+            // Compute post-level search hit once
+            $title_lc = strtolower($base['title']);
+            $services_lc = strtolower($base['services'] ?? '');
+            $owners_arr = is_array($base['owners']) ? $base['owners'] : [];
+            $owner_hit = false;
+            if ($q_lc !== '' && !empty($owners_arr)) {
+                foreach ($owners_arr as $o) {
+                    $nm = strtolower($o['name'] ?? '');
+                    if ($nm !== '' && strpos($nm, $q_lc) !== false) { $owner_hit = true; break; }
                 }
             }
-            $broad_args = [
-                'post_type' => CPT::POST_TYPE,
-                'post_status' => 'publish',
-                'meta_query' => $broad_meta,
-                'tax_query' => $tax_query,
-                'posts_per_page' => 200,
-                'orderby' => 'title',
-                'order' => 'ASC',
-                'no_found_rows' => true,
-            ];
-            $broad = new WP_Query($broad_args);
-            $q_lc = strtolower($q);
-            $filtered = [];
-            foreach ($broad->posts as $p) {
-                $pid = $p->ID;
-                $title = strtolower(get_the_title($pid));
-                $owners = (array) get_post_meta($pid, 'owners', true);
-                $services = strtolower((string) get_post_meta($pid, 'services_offered', true));
-                $city = strtolower((string) get_post_meta($pid, 'city', true));
-                $hit = false;
-                if (strpos($title, $q_lc) !== false) { $hit = true; }
-                if (!$hit && $services !== '' && strpos($services, $q_lc) !== false) { $hit = true; }
-                if (!$hit && $city !== '' && strpos($city, $q_lc) !== false) { $hit = true; }
-                if (!$hit && !empty($owners)) {
-                    foreach ($owners as $o) {
-                        if (!is_array($o)) continue;
-                        $name = strtolower($o['owner_name'] ?? '');
-                        if ($name !== '' && strpos($name, $q_lc) !== false) { $hit = true; break; }
+            $post_hit = ($q_lc === '') ||
+                        (strpos($title_lc, $q_lc) !== false) ||
+                        ($services_lc !== '' && strpos($services_lc, $q_lc) !== false) ||
+                        $owner_hit;
+            if ($terms && !is_wp_error($terms)) {
+                foreach ($terms as $t) {
+                    // If a specific category filter is set, include only that category
+                    if ($category && $t->slug !== $category) continue;
+                    // If searching, require either a post-level hit or a match on this term name
+                    if ($q_lc !== '' && !$post_hit) {
+                        $term_name_lc = strtolower($t->name);
+                        if (strpos($term_name_lc, $q_lc) === false) { continue; }
+                    }
+                    $k = $p->ID . '|' . $t->slug;
+                    if (isset($seen[$k])) continue;
+                    $row = $base;
+                    $row['cat_label'] = $t->name;
+                    $row['cat_slug']  = $t->slug;
+                    $expanded[] = $row;
+                    $seen[$k] = true;
+                }
+            } else {
+                // Uncategorized bucket when no terms and no category filter
+                if (!$category) {
+                    if ($q_lc !== '' && !$post_hit) { continue; }
+                    $k = $p->ID . '|_uncat';
+                    if (!isset($seen[$k])) {
+                        $row = $base;
+                        $row['cat_label'] = 'Uncategorized';
+                        $row['cat_slug']  = '_uncategorized';
+                        $expanded[] = $row;
+                        $seen[$k] = true;
                     }
                 }
-                if ($hit) { $filtered[] = $p; }
             }
-            $total = count($filtered);
-            $pages = (int) ceil($total / $per_page);
-            $offset = ($page - 1) * $per_page;
-            $slice = array_slice($filtered, $offset, $per_page);
-            $items = array_map([__CLASS__, 'format_item'], $slice);
         }
+        // No second pass required; PHP-side matching above handles search across
+        // title, owners, services, and category names.
+
+        // Sort rows by category label then business title (case-insensitive)
+        usort($expanded, function($a, $b){
+            $ac = strtolower($a['cat_label'] ?? '');
+            $bc = strtolower($b['cat_label'] ?? '');
+            if ($ac !== $bc) return $ac <=> $bc;
+            $at = strtolower($a['title'] ?? '');
+            $bt = strtolower($b['title'] ?? '');
+            return $at <=> $bt;
+        });
+
+        $total = count($expanded);
+        $pages = (int) ceil($total / $per_page);
+        $offset = ($page - 1) * $per_page;
+        $slice = array_slice($expanded, $offset, $per_page);
 
         return new WP_REST_Response([
-            'items' => $items,
+            'items' => $slice,
             'total' => $total,
             'pages' => $pages,
         ]);
@@ -255,7 +271,11 @@ class REST {
             'meta_query' => [ [ 'key' => 'show_in_directory', 'value' => '1' ] ],
         ]);
         foreach ($posts as $p) {
-            $suggestions[] = ['type' => 'business', 'label' => $p->post_title, 'slug' => $p->post_name];
+            $suggestions[] = [
+                'type' => 'business',
+                'label' => html_entity_decode($p->post_title, ENT_QUOTES, 'UTF-8'),
+                'slug' => $p->post_name
+            ];
         }
 
         // Owners and services_offered
@@ -284,7 +304,11 @@ class REST {
             }
             $svc = (string) get_post_meta($p->ID, 'services_offered', true);
             if ($svc !== '' && stripos($svc, $q) !== false) {
-                $suggestions[] = ['type' => 'service', 'label' => get_the_title($p->ID), 'slug' => $p->post_name];
+                $suggestions[] = [
+                    'type' => 'service',
+                    'label' => html_entity_decode(get_the_title($p->ID), ENT_QUOTES, 'UTF-8'),
+                    'slug' => $p->post_name
+                ];
             }
         }
 
@@ -318,6 +342,8 @@ class REST {
         $owners = (array)get_post_meta($id, 'owners', true);
         $links = (array)get_post_meta($id, 'links', true);
         $cats = get_the_terms($id, CPT::TAXONOMY);
+        $cat_names = $cats && !is_wp_error($cats) ? array_values(wp_list_pluck($cats, 'name')) : [];
+        $cat_slugs = $cats && !is_wp_error($cats) ? array_values(wp_list_pluck($cats, 'slug')) : [];
         $logo_id = (int) get_post_meta($id, 'business_logo_id', true);
         if (!$logo_id) {
             $thumb_id = get_post_thumbnail_id($id);
@@ -331,7 +357,8 @@ class REST {
         }
         return [
             'id' => $id,
-            'title' => get_the_title($id),
+            // Decode HTML entities (including numeric like &#8217;) for clean display
+            'title' => html_entity_decode(get_the_title($id), ENT_QUOTES, 'UTF-8'),
             'excerpt' => get_the_excerpt($id),
             'permalink' => get_permalink($id),
             'city' => (string)get_post_meta($id, 'city', true),
@@ -339,22 +366,31 @@ class REST {
             'email' => (string)get_post_meta($id, 'business_email', true),
             'website' => (string)get_post_meta($id, 'website_url', true),
             'owners' => array_values(array_map(function ($o) { return [
-                'name' => $o['owner_name'] ?? '',
+                'name' => html_entity_decode($o['owner_name'] ?? '', ENT_QUOTES, 'UTF-8'),
                 'role' => $o['owner_role'] ?? '',
             ];}, $owners)),
             'links' => array_values(array_map(function ($l) { return [
                 'label' => $l['link_label'] ?? '',
                 'url' => $l['link_url'] ?? '',
             ];}, $links)),
-            'categories' => $cats && !is_wp_error($cats) ? array_values(wp_list_pluck($cats, 'name')) : [],
+            'categories' => $cat_names,
+            'category_slugs' => $cat_slugs,
             'logo' => (string)$logo_url,
             'services' => $services,
-            'owner' => $first_owner,
+            'owner' => html_entity_decode($first_owner, ENT_QUOTES, 'UTF-8'),
             'flags' => [
                 'veteran_owned' => (bool)get_post_meta($id, 'veteran_owned', true),
                 'sons_owned' => (bool)get_post_meta($id, 'sons_owned', true),
                 'auxiliary_owned' => (bool)get_post_meta($id, 'auxiliary_owned', true),
             ],
         ];
+    }
+
+    /**
+     * Forces DISTINCT in WP_Query SQL to prevent duplicate posts when
+     * meta_query joins match multiple rows for a single post.
+     */
+    public static function force_distinct($distinct) {
+        return 'DISTINCT';
     }
 }

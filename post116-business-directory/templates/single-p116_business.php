@@ -125,6 +125,18 @@ if ($hero_img) {
 @media (max-width: 900px){
   .p116bd-single__grid{grid-template-columns:1fr}
   .p116bd-single__media img{max-width:100%;height:auto}
+  .p116bd-single{font-size:16px !important;line-height:26px !important;margin-bottom:50px !important}
+  .p116bd-single__container{padding:0 14px}
+  .p116bd-single__header h1{font-size:28px !important;margin:18px 0 6px 0}
+  .p116bd-hero__kicker{font-size:22px !important}
+  .p116bd-hero__heading{font-size:30px !important}
+  .p116bd-card{padding:14px 16px}
+  .p116bd-cta{padding:8px 12px;font-size:14px}
+  .p116bd-cta svg{width:16px;height:16px}
+  .p116bd-owners .p116bd-flag-icon{height:26px}
+  .p116bd-single h2{font-size:22px !important}
+  .p116bd-single h3{font-size:18px !important}
+  .p116bd-cats span{font-size:12px !important}
 }
 </style>
 
@@ -229,26 +241,32 @@ if ($hero_img) {
          </div>
 
         <?php if (!empty($owners)): ?>
-          <div class="p116bd-card">
-          <h3><?php esc_html_e('Owners', 'post116-business-directory'); ?></h3>
-          <ul class="p116bd-owners">
-            <?php foreach ($owners as $o): ?>
-              <?php 
-                $aff = $o['owner_affil'] ?? '';
-                $aff_icon = '';
-                if ($aff === 'veteran') $aff_icon = P116BD_PLUGIN_URL . 'public/icons/TAL-emblem-full-detail-RGB.png';
-                elseif ($aff === 'sal') $aff_icon = P116BD_PLUGIN_URL . 'public/icons/SAL-Emblem.png';
-                elseif ($aff === 'auxiliary') $aff_icon = P116BD_PLUGIN_URL . 'public/icons/Auxiliary-Emblem.png';
-                $owner_phone_raw = $o['owner_phone'] ?? '';
-                $owner_email_raw = $o['owner_email'] ?? '';
-                $biz_phone_raw = $phone ?? '';
-                $biz_email_raw = $email ?? '';
-                $owner_phone_norm = preg_replace('/\D+/', '', $owner_phone_raw);
-                $biz_phone_norm   = preg_replace('/\D+/', '', $biz_phone_raw);
-                $owner_email_norm = strtolower(trim($owner_email_raw));
-                $biz_email_norm   = strtolower(trim($biz_email_raw));
-                $show_owner_call  = ($owner_phone_norm !== '') && ($owner_phone_norm !== $biz_phone_norm);
-                $show_owner_email = ($owner_email_norm !== '') && ($owner_email_norm !== $biz_email_norm);
+          <?php
+            // Split owners by presence of role
+            $owners_with_role = [];
+            $owners_no_role = [];
+            foreach ($owners as $o) {
+              if (!empty(trim($o['owner_role'] ?? ''))) { $owners_with_role[] = $o; }
+              else { $owners_no_role[] = $o; }
+            }
+
+            // Helper to render owner list items
+            $render_owner_li = function($o) use ($phone, $email, $website) {
+              $aff = $o['owner_affil'] ?? '';
+              $aff_icon = '';
+              if ($aff === 'veteran') $aff_icon = P116BD_PLUGIN_URL . 'public/icons/TAL-emblem-full-detail-RGB.png';
+              elseif ($aff === 'sal') $aff_icon = P116BD_PLUGIN_URL . 'public/icons/SAL-Emblem.png';
+              elseif ($aff === 'auxiliary') $aff_icon = P116BD_PLUGIN_URL . 'public/icons/Auxiliary-Emblem.png';
+              $owner_phone_raw = $o['owner_phone'] ?? '';
+              $owner_email_raw = $o['owner_email'] ?? '';
+              $biz_phone_raw = $phone ?? '';
+              $biz_email_raw = $email ?? '';
+              $owner_phone_norm = preg_replace('/\D+/', '', $owner_phone_raw);
+              $biz_phone_norm   = preg_replace('/\D+/', '', $biz_phone_raw);
+              $owner_email_norm = strtolower(trim($owner_email_raw));
+              $biz_email_norm   = strtolower(trim($biz_email_raw));
+              $show_owner_call  = ($owner_phone_norm !== '') && ($owner_phone_norm !== $biz_phone_norm);
+              $show_owner_email = ($owner_email_norm !== '') && ($owner_email_norm !== $biz_email_norm);
               ?>
               <li>
                 <strong><?php echo esc_html($o['owner_name'] ?? ''); ?></strong>
@@ -266,9 +284,26 @@ if ($hero_img) {
                   <?php endif; ?>
                 </div>
               </li>
-            <?php endforeach; ?>
-          </ul>
-          </div>
+              <?php
+            };
+          ?>
+
+          <?php if (!empty($owners_no_role)): ?>
+            <div class="p116bd-card">
+              <h3><?php esc_html_e('Owners', 'post116-business-directory'); ?></h3>
+              <ul class="p116bd-owners">
+                <?php foreach ($owners_no_role as $o) { $render_owner_li($o); } ?>
+              </ul>
+            </div>
+          <?php endif; ?>
+
+          <?php if (!empty($owners_with_role)): ?>
+            <div class="p116bd-card">
+              <ul class="p116bd-owners">
+                <?php foreach ($owners_with_role as $o) { $render_owner_li($o); } ?>
+              </ul>
+            </div>
+          <?php endif; ?>
         <?php endif; ?>
 
         <?php if (!empty($links)): ?>

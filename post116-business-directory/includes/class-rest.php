@@ -1,0 +1,396 @@
+<?php
+namespace P116BD;
+
+use WP_Query;
+use WP_REST_Request;
+use WP_REST_Response;
+
+if (!defined('ABSPATH')) { exit; }
+
+class REST {
+    const NS = 'p116/v1';
+
+    public static function register() {
+        add_action('rest_api_init', function () {
+            register_rest_route(self::NS, '/search', [
+                'methods'  => 'GET',
+                'callback' => [__CLASS__, 'search'],
+                'permission_callback' => '__return_true',
+                'args' => [
+                    'q' => ['type'=>'string','required'=>false],
+                    'category' => ['type'=>'string','required'=>false],
+                    'flags' => ['type'=>'array','required'=>false],
+                    'per_page' => ['type'=>'integer','default'=>20],
+                    'page' => ['type'=>'integer','default'=>1],
+                ],
+            ]);
+            register_rest_route(self::NS, '/autocomplete', [
+                'methods'  => 'GET',
+                'callback' => [__CLASS__, 'autocomplete'],
+                'permission_callback' => '__return_true',
+                'args' => [
+                    'q' => ['type'=>'string','required'=>true],
+                    'limit' => ['type'=>'integer','default'=>8],
+                ],
+            ]);
+            register_rest_route(self::NS, '/contact', [
+                'methods'  => 'POST',
+                'callback' => [__CLASS__, 'contact_business'],
+                'permission_callback' => '__return_true',
+            ]);
+        });
+    }
+
+    // debug logging removed
+
+    public static function search(WP_REST_Request $req) {
+        $q = sanitize_text_field($req->get_param('q'));
+        $category = sanitize_text_field($req->get_param('category'));
+        $flags = (array)$req->get_param('flags');
+        $per_page = max(1, min(50, (int)$req->get_param('per_page')));
+        $page = max(1, (int)$req->get_param('page'));
+        global $wpdb;
+        $like_q    = $q !== '' ? '%' . $wpdb->esc_like($q) . '%' : '';
+        $like_q_lc = $q !== '' ? '%' . $wpdb->esc_like(strtolower($q)) . '%' : '';
+
+        // Base visibility + flag filters. We deliberately do NOT filter by $q in SQL,
+        // because the search must match title, category name, owners, or services.
+        // Those fields span post title, taxonomy names, and meta — easier and more
+        // reliable to evaluate together in PHP after fetching.
+        $meta_query = [ 'relation' => 'AND', [ 'key' => 'show_in_directory', 'value' => '1' ] ];
+        foreach (['veteran_owned','sons_owned','auxiliary_owned'] as $flag) {
+            if (in_array($flag, $flags, true)) {
+                $meta_query[] = ['key' => $flag, 'value' => '1'];
+            }
+        }
+
+        $tax_query = [];
+        if ($category) {
+            $tax_query[] = [
+                'taxonomy' => CPT::TAXONOMY,
+                'field' => 'slug',
+                'terms' => [$category],
+            ];
+        }
+
+        // Fetch a broad result set, then expand each post into one row per category,
+        // and sort rows by category name then business title. This guarantees
+        // server-side ordering across pagination and supports multi-category posts.
+        $broad_args = [
+            'post_type' => CPT::POST_TYPE,
+            'post_status' => 'publish',
+            'meta_query' => $meta_query,
+            'tax_query' => $tax_query,
+            'posts_per_page' => 400, // directory scale; adjust if needed
+            'orderby' => 'title',
+            'order' => 'ASC',
+            'no_found_rows' => true,
+        ];
+        $broad = new WP_Query($broad_args);
+        $expanded = [];
+        $seen = [];
+        $q_lc = strtolower($q);
+        foreach ($broad->posts as $p) {
+            $base = self::format_item($p);
+            $terms = get_the_terms($p->ID, CPT::TAXONOMY);
+            // Compute post-level search hit once
+            $title_lc = strtolower($base['title']);
+            $services_lc = strtolower($base['services'] ?? '');
+            $owners_arr = is_array($base['owners']) ? $base['owners'] : [];
+            $owner_hit = false;
+            if ($q_lc !== '' && !empty($owners_arr)) {
+                foreach ($owners_arr as $o) {
+                    $nm = strtolower($o['name'] ?? '');
+                    if ($nm !== '' && strpos($nm, $q_lc) !== false) { $owner_hit = true; break; }
+                }
+            }
+            $post_hit = ($q_lc === '') ||
+                        (strpos($title_lc, $q_lc) !== false) ||
+                        ($services_lc !== '' && strpos($services_lc, $q_lc) !== false) ||
+                        $owner_hit;
+            if ($terms && !is_wp_error($terms)) {
+                foreach ($terms as $t) {
+                    // If a specific category filter is set, include only that category
+                    if ($category && $t->slug !== $category) continue;
+                    // If searching, require either a post-level hit or a match on this term name
+                    if ($q_lc !== '' && !$post_hit) {
+                        $term_name_lc = strtolower($t->name);
+                        if (strpos($term_name_lc, $q_lc) === false) { continue; }
+                    }
+                    $k = $p->ID . '|' . $t->slug;
+                    if (isset($seen[$k])) continue;
+                    $row = $base;
+                    $row['cat_label'] = $t->name;
+                    $row['cat_slug']  = $t->slug;
+                    $expanded[] = $row;
+                    $seen[$k] = true;
+                }
+            } else {
+                // Uncategorized bucket when no terms and no category filter
+                if (!$category) {
+                    if ($q_lc !== '' && !$post_hit) { continue; }
+                    $k = $p->ID . '|_uncat';
+                    if (!isset($seen[$k])) {
+                        $row = $base;
+                        $row['cat_label'] = 'Uncategorized';
+                        $row['cat_slug']  = '_uncategorized';
+                        $expanded[] = $row;
+                        $seen[$k] = true;
+                    }
+                }
+            }
+        }
+        // No second pass required; PHP-side matching above handles search across
+        // title, owners, services, and category names.
+
+        // Sort rows by category label then business title (case-insensitive)
+        usort($expanded, function($a, $b){
+            $ac = strtolower($a['cat_label'] ?? '');
+            $bc = strtolower($b['cat_label'] ?? '');
+            if ($ac !== $bc) return $ac <=> $bc;
+            $at = strtolower($a['title'] ?? '');
+            $bt = strtolower($b['title'] ?? '');
+            return $at <=> $bt;
+        });
+
+        $total = count($expanded);
+        $pages = (int) ceil($total / $per_page);
+        $offset = ($page - 1) * $per_page;
+        $slice = array_slice($expanded, $offset, $per_page);
+
+        return new WP_REST_Response([
+            'items' => $slice,
+            'total' => $total,
+            'pages' => $pages,
+        ]);
+    }
+
+    public static function contact_business(WP_REST_Request $req) {
+        $post_id = absint($req->get_param('post_id'));
+        $post = $post_id ? get_post($post_id) : null;
+        if (!$post || $post->post_type !== CPT::POST_TYPE || get_post_status($post_id) !== 'publish' || !empty($post->post_password)) {
+            return new WP_REST_Response(['error' => 'Invalid business.'], 400);
+        }
+        // Basic rate limiting (per IP and globally) to reduce abuse
+        $ip = isset($_SERVER['HTTP_X_FORWARDED_FOR']) ? sanitize_text_field(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0]) : (isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field($_SERVER['REMOTE_ADDR']) : '0.0.0.0');
+        $ip = substr($ip, 0, 64); // clamp
+        $window = 10 * 60; // 10 minutes
+        $per_post_limit = 3; // max 3 per post per IP per window
+        $global_limit   = 10; // max 10 per IP per window sitewide
+        $k_post   = 'p116bd_rl_post_' . md5($post_id . '|' . $ip);
+        $k_global = 'p116bd_rl_global_' . md5($ip);
+        $c_post   = (int) get_transient($k_post);
+        $c_global = (int) get_transient($k_global);
+        if ($c_post >= $per_post_limit || $c_global >= $global_limit) {
+            return new WP_REST_Response(['error' => 'Rate limit reached. Please try again later.'], 429);
+        }
+        $name = sanitize_text_field($req->get_param('name'));
+        $phone = sanitize_text_field($req->get_param('phone'));
+        $email = sanitize_email($req->get_param('email'));
+        $message = sanitize_textarea_field($req->get_param('message'));
+        if ($name === '' || $message === '') {
+            return new WP_REST_Response(['error' => 'Name and message are required.'], 400);
+        }
+        if ($email !== '' && !is_email($email)) {
+            return new WP_REST_Response(['error' => 'Invalid email.'], 400);
+        }
+        // Require at least one contact method
+        if ($email === '' && $phone === '') {
+            return new WP_REST_Response(['error' => 'Provide phone or email.'], 400);
+        }
+        // reCAPTCHA validation if configured
+        $secret = trim((string) get_option('p116bd_recaptcha_secret', ''));
+        if ($secret !== '') {
+            $token = $req->get_param('g-recaptcha-response') ?: $req->get_param('token');
+            if (!$token) return new WP_REST_Response(['error' => 'Captcha required.'], 400);
+            $resp = wp_remote_post('https://www.google.com/recaptcha/api/siteverify', [
+                'timeout' => 8,
+                'body' => [ 'secret' => $secret, 'response' => $token ]
+            ]);
+            if (is_wp_error($resp)) {
+                return new WP_REST_Response(['error' => 'Captcha verification failed.'], 400);
+            }
+            $data = json_decode(wp_remote_retrieve_body($resp), true);
+            if (empty($data['success'])) {
+                return new WP_REST_Response(['error' => 'Captcha invalid.'], 400);
+            }
+        }
+        // Build allowed recipient set (owners + business email)
+        $allowed = [];
+        $owners = (array) get_post_meta($post_id, 'owners', true);
+        foreach ($owners as $o) {
+            $oe = isset($o['owner_email']) ? sanitize_email($o['owner_email']) : '';
+            if ($oe && is_email($oe)) $allowed[$oe] = true;
+        }
+        $be = sanitize_email((string)get_post_meta($post_id, 'business_email', true));
+        if ($be && is_email($be)) $allowed[$be] = true;
+        if (empty($allowed)) {
+            return new WP_REST_Response(['error' => 'No recipient configured.'], 400);
+        }
+        // Single recipient selection, validated server-side
+        $recipient = sanitize_email((string)$req->get_param('recipient'));
+        if ($recipient === '' || !isset($allowed[$recipient])) {
+            // If client tampers with recipient, reject
+            if ($recipient !== '') {
+                return new WP_REST_Response(['error' => 'Invalid recipient.'], 400);
+            }
+            // Fallback to business email or first allowed
+            $recipient = $be ?: array_key_first($allowed);
+        }
+        $to = $recipient;
+        $subject = sprintf('[Post 116 Directory] Inquiry for %s', get_the_title($post_id));
+        $lines = [];
+        $lines[] = 'From: ' . $name;
+        if ($phone) $lines[] = 'Phone: ' . $phone;
+        if ($email) $lines[] = 'Email: ' . $email;
+        $lines[] = '';
+        $lines[] = $message;
+        $body = implode("\n", $lines);
+        $headers = [];
+        if ($email) $headers[] = 'Reply-To: ' . $email;
+        $sent = wp_mail($to, $subject, $body, $headers);
+        if (!$sent) return new WP_REST_Response(['error' => 'Failed to send.'], 500);
+        // increment counters
+        set_transient($k_post, $c_post + 1, $window);
+        set_transient($k_global, $c_global + 1, $window);
+        return new WP_REST_Response(['ok' => true]);
+    }
+
+    public static function autocomplete(WP_REST_Request $req) {
+        $q = sanitize_text_field($req->get_param('q'));
+        $limit = max(1, min(20, (int)$req->get_param('limit')));
+
+        $suggestions = [];
+
+        // Business titles
+        $posts = get_posts([
+            'post_type' => CPT::POST_TYPE,
+            's' => $q,
+            'posts_per_page' => $limit,
+            'post_status' => 'publish',
+            'meta_query' => [ [ 'key' => 'show_in_directory', 'value' => '1' ] ],
+        ]);
+        foreach ($posts as $p) {
+            $suggestions[] = [
+                'type' => 'business',
+                'label' => html_entity_decode($p->post_title, ENT_QUOTES, 'UTF-8'),
+                'slug' => $p->post_name
+            ];
+        }
+
+        // Owners and services_offered
+        $owner_posts = get_posts([
+            'post_type' => CPT::POST_TYPE,
+            'posts_per_page' => $limit,
+            'meta_query' => [
+                'relation' => 'AND',
+                ['key' => 'show_in_directory', 'value' => '1'],
+                [
+                    'relation' => 'OR',
+                    ['key' => 'owners_search', 'value' => strtolower($q), 'compare' => 'LIKE'],
+                    ['key' => 'services_offered', 'value' => $q, 'compare' => 'LIKE'],
+                ]
+            ],
+            'post_status' => 'publish',
+        ]);
+        $q_lc = strtolower($q);
+        foreach ($owner_posts as $p) {
+            $owners = (array)get_post_meta($p->ID, 'owners', true);
+            foreach ($owners as $o) {
+                $name = $o['owner_name'] ?? '';
+                if ($name !== '' && strpos(strtolower($name), $q_lc) !== false) {
+                    $suggestions[] = ['type' => 'owner', 'label' => $o['owner_name'], 'slug' => $p->post_name];
+                }
+            }
+            $svc = (string) get_post_meta($p->ID, 'services_offered', true);
+            if ($svc !== '' && stripos($svc, $q) !== false) {
+                $suggestions[] = [
+                    'type' => 'service',
+                    'label' => html_entity_decode(get_the_title($p->ID), ENT_QUOTES, 'UTF-8'),
+                    'slug' => $p->post_name
+                ];
+            }
+        }
+
+        // Categories
+        $terms = get_terms([
+            'taxonomy' => CPT::TAXONOMY,
+            'name__like' => $q,
+            'number' => $limit,
+            'hide_empty' => false,
+        ]);
+        if (!is_wp_error($terms)) {
+            foreach ($terms as $t) {
+                $suggestions[] = ['type' => 'category', 'label' => $t->name, 'slug' => $t->slug];
+            }
+        }
+
+        // Unique by label+type
+        $unique = [];
+        $out = [];
+        foreach ($suggestions as $s) {
+            $k = $s['type'] . '|' . $s['label'];
+            if (!isset($unique[$k])) { $unique[$k] = true; $out[] = $s; }
+            if (count($out) >= $limit) break;
+        }
+
+        return new WP_REST_Response(['items' => $out]);
+    }
+
+    private static function format_item($post) {
+        $id = $post->ID;
+        $owners = (array)get_post_meta($id, 'owners', true);
+        $links = (array)get_post_meta($id, 'links', true);
+        $cats = get_the_terms($id, CPT::TAXONOMY);
+        $cat_names = $cats && !is_wp_error($cats) ? array_values(wp_list_pluck($cats, 'name')) : [];
+        $cat_slugs = $cats && !is_wp_error($cats) ? array_values(wp_list_pluck($cats, 'slug')) : [];
+        $logo_id = (int) get_post_meta($id, 'business_logo_id', true);
+        if (!$logo_id) {
+            $thumb_id = get_post_thumbnail_id($id);
+            if ($thumb_id) { $logo_id = (int)$thumb_id; }
+        }
+        $logo_url = $logo_id ? wp_get_attachment_image_url($logo_id, 'medium') : '';
+        $services = (string)get_post_meta($id, 'services_offered', true);
+        $first_owner = '';
+        if (!empty($owners) && is_array($owners)) {
+            $first_owner = $owners[0]['owner_name'] ?? '';
+        }
+        return [
+            'id' => $id,
+            // Decode HTML entities (including numeric like &#8217;) for clean display
+            'title' => html_entity_decode(get_the_title($id), ENT_QUOTES, 'UTF-8'),
+            'excerpt' => get_the_excerpt($id),
+            'permalink' => get_permalink($id),
+            'city' => (string)get_post_meta($id, 'city', true),
+            'phone' => (string)get_post_meta($id, 'business_phone', true),
+            'email' => (string)get_post_meta($id, 'business_email', true),
+            'website' => (string)get_post_meta($id, 'website_url', true),
+            'owners' => array_values(array_map(function ($o) { return [
+                'name' => html_entity_decode($o['owner_name'] ?? '', ENT_QUOTES, 'UTF-8'),
+                'role' => $o['owner_role'] ?? '',
+            ];}, $owners)),
+            'links' => array_values(array_map(function ($l) { return [
+                'label' => $l['link_label'] ?? '',
+                'url' => $l['link_url'] ?? '',
+            ];}, $links)),
+            'categories' => $cat_names,
+            'category_slugs' => $cat_slugs,
+            'logo' => (string)$logo_url,
+            'services' => $services,
+            'owner' => html_entity_decode($first_owner, ENT_QUOTES, 'UTF-8'),
+            'flags' => [
+                'veteran_owned' => (bool)get_post_meta($id, 'veteran_owned', true),
+                'sons_owned' => (bool)get_post_meta($id, 'sons_owned', true),
+                'auxiliary_owned' => (bool)get_post_meta($id, 'auxiliary_owned', true),
+            ],
+        ];
+    }
+
+    /**
+     * Forces DISTINCT in WP_Query SQL to prevent duplicate posts when
+     * meta_query joins match multiple rows for a single post.
+     */
+    public static function force_distinct($distinct) {
+        return 'DISTINCT';
+    }
+}
